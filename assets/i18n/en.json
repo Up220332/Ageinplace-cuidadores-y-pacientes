@@ -1,0 +1,48 @@
+{
+	"app_bar": 
+	{
+		"title": "Language Selection"
+	},
+	"button": 
+	{
+		"cancel": "Cancel",
+		"change_language": "Change Language"
+	},
+	"language": 
+	{
+		"name": 
+		{
+			"en": "English",
+			"es": "Spanish"
+
+		},
+		"selected_message": "Currently selected language is {language}",
+		"selection": 
+		{
+			"message": "Please select a language from the list",
+			"title": "Language Selection"
+		}
+	},
+	"plural": 
+	{
+		"demo": 
+		{
+			"zero": "Please start pushing the 'plus' button.",
+			"one": "You have pushed the button one time.",
+			"two": "You have pushed the button two times.",
+			"other": "You have pushed the button {{value}} times."
+		}
+	},
+	"tiempo_real_page": {
+		"titulo": "Real-time Page",
+		"actualizar_datos": "Update Data",
+		"mensaje_actualizacion": "Data has been updated successfully.",
+		"boton_cancelar": "Cancel",
+		"boton_confirmar": "Confirm",
+		"alarma_activa": "Active Alarm",
+		"alarma_inactiva": "Inactive Alarm",
+		"texto_problema": "There has been a problem, the device is off or the connection is lost"
+	}
+	
+	
+}

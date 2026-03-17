@@ -1,0 +1,48 @@
+{
+	"app_bar": 
+	{
+		"title": "Selección de idioma"
+	},
+	"button": 
+	{
+		"cancel": "Cancelar",
+		"change_language": "Cambiar idioma"
+	},
+	"language": 
+	{
+		"name": 
+		{
+			"en": "Inglés",
+			"es": "Español"
+		},
+		"selected_message": "El idioma seleccionado actualmente es {language}",
+		"selection": 
+		{
+			"message": "Por favor seleccione un idioma de la lista",
+			"title": "Selección de idioma"
+		}
+	},
+	"plural": 
+	{
+		"demo": 
+		{
+			"zero": "Por favor, comience a presionar el botón 'más'.",
+			"one": "Has pulsado el botón una vez.",
+			"two": "Has pulsado el botón dos veces.",
+			"other": "Ha pulsado el botón {{value}} veces."
+		}
+	},
+	"tiempo_real_page": {
+		"titulo": "Página de Tiempo Real",
+		"actualizar_datos": "Actualizar Datos",
+		"mensaje_actualizacion": "Los datos se han actualizado correctamente.",
+		"boton_cancelar": "Cancelar",
+		"boton_confirmar": "Confirmar",
+		"alarma_activa": "Alarma activa",
+		"alarma_inactiva": "Alarma inactiva",
+		"texto_problema": "Ha habido un problema, el dispositivo está apagado o se ha perdido la conexión"
+	},
+	"NavBar":{
+		
+	}
+}
