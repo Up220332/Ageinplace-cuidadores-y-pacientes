@@ -258,7 +258,6 @@ class _LogInScreenState extends State<LogInScreen> {
                       child: TextFormField(
                         controller: passwordController,
                         obscureText: !passwordVisibility,
-                        // SIN VALIDATOR - LA CONTRASEÑA ES OPCIONAL
                         onChanged: (value) {
                           setState(() {
                             _btnActivePassword = value.isNotEmpty;
@@ -266,8 +265,8 @@ class _LogInScreenState extends State<LogInScreen> {
                         },
                         decoration: InputDecoration(
                           labelText: _currentLocale == 'es' 
-                              ? 'Contraseña (opcional)' 
-                              : 'Password (optional)',
+                              ? 'Contraseña' 
+                              : 'Password',
                           hintText: '••••••••',
                           prefixIcon: Icon(Icons.lock_outline, color: colorPrimario, size: 22),
                           suffixIcon: IconButton(
@@ -299,7 +298,6 @@ class _LogInScreenState extends State<LogInScreen> {
                     
                     const SizedBox(height: 8),
                     
-                    // Olvido contraseña (opcional, solo si se usa contraseña)
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
