@@ -33,8 +33,6 @@ class _WearablePacienteCuidadorScreenState
   late int CodPacienteWearableExist = 1;
 
   final colorPrimario = const Color.fromARGB(255, 25, 144, 234);
-  
-  // ELIMINADO: late bool isSpanish;
 
   Map<String, String> wearableTypeTranslations = {
     'Banda': 'Band',
@@ -93,15 +91,11 @@ class _WearablePacienteCuidadorScreenState
   @override
   void initState() {
     super.initState();
-    // ELIMINADO: FlutterLocalization.instance.onTranslatedLanguage = _onLanguageChanged;
     getData();
   }
 
-  // ELIMINADO: void _onLanguageChanged(Locale? locale) {...}
-
   @override
   void dispose() {
-    // ELIMINADO: FlutterLocalization.instance.onTranslatedLanguage = null;
     super.dispose();
   }
 
@@ -130,9 +124,9 @@ class _WearablePacienteCuidadorScreenState
   Widget build(BuildContext context) {
     PacientesList.sort((a, b) => a.F_ALTA.compareTo(b.F_ALTA));
     List<String> etiquetas = generarEtiquetas(WearableList);
-    
-    // AGREGADO: isSpanish DENTRO del build
-    final bool isSpanish = FlutterLocalization.instance.currentLocale?.languageCode == 'es';
+
+    final bool isSpanish =
+        FlutterLocalization.instance.currentLocale?.languageCode == 'es';
 
     return WillPopScope(
       onWillPop: () async {
@@ -149,7 +143,13 @@ class _WearablePacienteCuidadorScreenState
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PacientesCuidadorScreen(),
+                ),
+                (route) => false,
+              );
             },
           ),
           title: Text(
@@ -178,7 +178,9 @@ class _WearablePacienteCuidadorScreenState
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          isSpanish ? 'No hay wearables asignados' : 'No wearables assigned',
+                          isSpanish
+                              ? 'No hay wearables asignados'
+                              : 'No wearables assigned',
                           style: TextStyle(
                             fontSize: 18,
                             color: Colors.grey.shade600,
@@ -186,7 +188,9 @@ class _WearablePacienteCuidadorScreenState
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          isSpanish ? 'Este paciente no tiene wearables' : 'This patient has no wearables',
+                          isSpanish
+                              ? 'Este paciente no tiene wearables'
+                              : 'This patient has no wearables',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey.shade500,
@@ -199,7 +203,12 @@ class _WearablePacienteCuidadorScreenState
                     physics: const BouncingScrollPhysics(),
                     itemCount: WearableList.length,
                     itemBuilder: (context, index) {
-                      return _buildWearableCard(context, index, etiquetas, isSpanish);
+                      return _buildWearableCard(
+                        context,
+                        index,
+                        etiquetas,
+                        isSpanish,
+                      );
                     },
                   ),
           ),
@@ -302,8 +311,9 @@ class _WearablePacienteCuidadorScreenState
                       child: Text(
                         isSpanish
                             ? wearable.TipoWeareable
-                            : (wearableTypeTranslations[wearable.TipoWeareable] ??
-                                wearable.TipoWeareable),
+                            : (wearableTypeTranslations[wearable
+                                      .TipoWeareable] ??
+                                  wearable.TipoWeareable),
                         style: TextStyle(
                           fontSize: 11,
                           color: colorPrimario,

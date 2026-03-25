@@ -373,27 +373,6 @@ Widget build(BuildContext context) {
         ],
       ),
       
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: FloatingActionButton.extended(
-          heroTag: "btn",
-          backgroundColor: colorPrimario,
-          label: Text(
-            isSpanish ? 'Agregar pregunta' : 'Add question',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          icon: const Icon(Icons.add, color: Colors.white),
-          onPressed: () {
-            _addQuestion(context, isSpanish);
-          },
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -1767,8 +1746,132 @@ Widget build(BuildContext context) {
                               height: 50,
                               child: ElevatedButton(
                                 onPressed: () async {
-                                  // Aquí va tu código de guardado
-                                  // (el mismo que tenías antes)
+                                  if (isCreatingNew) {
+                                    // Validar nueva pregunta
+                                    if (newQuestionText.trim().isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          backgroundColor: Colors.red,
+                                          content: Text(
+                                            isSpanish
+                                                ? 'Por favor escribe una pregunta'
+                                                : 'Please write a question',
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    
+                                    if (selectedDays.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          backgroundColor: Colors.red,
+                                          content: Text(
+                                            isSpanish
+                                                ? 'Por favor selecciona al menos un día'
+                                                : 'Please select at least one day',
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    
+                                    // Mostrar indicador de carga
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (context) => const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                    
+                                    try {
+                                      // 1. Crear la nueva pregunta en la BD
+                                      await DBPostgres().DBAddQuestion(newQuestionText.trim());
+                                      
+                                      // 2. Obtener el ID de la pregunta recién creada
+                                      await getData(); // Recarga la lista de preguntas
+                                      
+                                      // Buscar la pregunta recién creada
+                                      Question? nuevaPregunta = questionsList?.firstWhere(
+                                        (q) => q.desQuestion == newQuestionText.trim(),
+                                      );
+                                      
+                                      if (nuevaPregunta != null) {
+                                        // 3. Asignarla con los días seleccionados
+                                        await DBPostgres().dbAssignQuestionPatient(
+                                          codUsuario: widget.pacienteId,
+                                          codPregunta: nuevaPregunta.codQuestion,
+                                          diasSeleccionados: selectedDays,
+                                        );
+                                        
+                                        // 4. Recargar datos
+                                        await getQuestionsByDate(selectedDate!);
+                                        await loadAllQuestions();
+                                        
+                                        Navigator.pop(context); // Cerrar indicador
+                                        Navigator.pop(context); // Cerrar diálogo
+                                        
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: Colors.green,
+                                            content: Text(
+                                              isSpanish
+                                                  ? 'Pregunta creada y asignada correctamente'
+                                                  : 'Question created and assigned successfully',
+                                            ),
+                                          ),
+                                        );
+                                        
+                                        setState(() {});
+                                      }
+                                    } catch (e) {
+                                      Navigator.pop(context); // Cerrar indicador
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          backgroundColor: Colors.red,
+                                          content: Text(
+                                            isSpanish
+                                                ? 'Error al crear la pregunta'
+                                                : 'Error creating question',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    // Modo existente
+                                    if (selectQuestion != null && selectedDays.isNotEmpty) {
+                                      await DBPostgres().dbAssignQuestionPatient(
+                                        codUsuario: widget.pacienteId,
+                                        codPregunta: selectQuestion!.codQuestion,
+                                        diasSeleccionados: selectedDays,
+                                      );
+                                      await getQuestionsByDate(selectedDate!);
+                                      setState(() {});
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          backgroundColor: Colors.green,
+                                          content: Text(
+                                            isSpanish
+                                                ? 'Pregunta añadida correctamente'
+                                                : 'Question successfully added',
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          backgroundColor: Colors.red,
+                                          content: Text(
+                                            isSpanish
+                                                ? 'Por favor selecciona pregunta y al menos un día.'
+                                                : 'Please select a question and at least one day.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: colorPrimario,
