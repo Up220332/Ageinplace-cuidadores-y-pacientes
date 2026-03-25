@@ -1,110 +1,161 @@
-import 'package:ageinplace/Cuidador/screen_question_stadistics.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:intl/intl.dart';
 
-import '../BarraLateral/NavBar_caregiver.dart';
 import '../base_de_datos/influx.dart';
 import '../base_de_datos/postgres.dart';
 
-class PreguntasPacienteScreen extends StatefulWidget {
-  final int pacienteId;
+class ScreenQuestionStatisticsScreen extends StatefulWidget {
+  final int patientId;
 
-  const PreguntasPacienteScreen({super.key, required this.pacienteId});
+  const ScreenQuestionStatisticsScreen({super.key, required this.patientId});
 
   @override
-  _PreguntasPacienteScreenState createState() =>
-      _PreguntasPacienteScreenState();
+  _ScreenQuestionStatisticsScreen createState() =>
+      _ScreenQuestionStatisticsScreen();
 }
 
-class _PreguntasPacienteScreenState extends State<PreguntasPacienteScreen> {
+class _ScreenQuestionStatisticsScreen
+    extends State<ScreenQuestionStatisticsScreen> {
+  List<Question>? allPatientQuestions; 
+  Map<int, List<Question>> questionsByDay = {}; 
+  Map<String, Map<int, int>> answersByDay = {}; 
   DateTime? selectedDate;
-  List<Question>? questionsList;
+  DateTime? weekStart;
+  DateTime? weekEnd;
   bool loading = false;
-  List<Question>? questionsByDateList;
-  Map<int, bool> answeredQuestionsMap = {};
-  Map<int, String> questionAnswersMap = {};
-
-  bool showAllQuestions = false;
-
-  Map<int, Map<String, dynamic>> uniqueQuestionsMap = {};
-
+  
   final colorPrimario = const Color.fromARGB(255, 25, 144, 234);
 
-  final List<Map<String, dynamic>> weekDays = [
-    {'id': 1, 'name_es': 'Lunes', 'name_en': 'Monday'},
-    {'id': 2, 'name_es': 'Martes', 'name_en': 'Tuesday'},
-    {'id': 3, 'name_es': 'Miércoles', 'name_en': 'Wednesday'},
-    {'id': 4, 'name_es': 'Jueves', 'name_en': 'Thursday'},
-    {'id': 5, 'name_es': 'Viernes', 'name_en': 'Friday'},
-    {'id': 6, 'name_es': 'Sábado', 'name_en': 'Saturday'},
-    {'id': 7, 'name_es': 'Domingo', 'name_en': 'Sunday'},
-  ];
-
-  Future<String> getData() async {
-    final data = await DBPostgres().DBGetQuestions();
-
-    if (data is List) {
-      setState(() {
-        questionsList = data.map((row) {
-          return Question(row[0], row[1], row[2], row[3]);
-        }).toList();
-      });
-    } else {
-      print('Error al obtener las preguntas: $data');
-    }
-    return 'Successfully Fetched data';
-  }
-
-  Future<String> getQuestionsByDate(DateTime date) async {
-    final int weekDay = date.weekday;
-    print('=== getQuestionsByDate para fecha: $date, día: $weekDay ===');
-
-    final dataQuestionsByDate = await DBPostgres().DBGetQuestionsByAssignment(
-      patientId: widget.pacienteId,
-      weekDay: weekDay,
-    );
-
-    print('Datos recibidos: $dataQuestionsByDate');
-    print('Cantidad de preguntas: ${dataQuestionsByDate.length}');
-
-    final List<Question> tempList = [];
-
-    for (final row in dataQuestionsByDate) {
-      print('Row: $row');
-      final question = Question(row[0], row[1], row[2], row[3]);
-
-      final wasAnswered = await InfluxDBService().checkIfAnswered(
-        widget.pacienteId,
-        question.codQuestion,
-      );
-
-      answeredQuestionsMap[question.codQuestion] = wasAnswered;
-
-      tempList.add(question);
-
-      if (question.dateLeavingQuestion == null) {
-        if (!uniqueQuestionsMap.containsKey(question.codQuestion)) {
-          uniqueQuestionsMap[question.codQuestion] = {
-            'codQuestion': question.codQuestion,
-            'desQuestion': question.desQuestion,
-            'dischargeDateQuestion': question.dischargeDateQuestion,
-            'dateLeavingQuestion': question.dateLeavingQuestion,
-            'days': <int>{weekDay},
-          };
-        } else {
-          (uniqueQuestionsMap[question.codQuestion]!['days'] as Set<int>).add(
-            weekDay,
-          );
-        }
-      }
-    }
-
+  // Cargar todas las preguntas activas del paciente y agruparlas por día
+  Future<void> loadPatientActiveQuestions() async {
     setState(() {
-      questionsByDateList = tempList;
+      loading = true;
     });
 
-    return 'Successfully Fetched dataQuestionsByDate';
+    try {
+      final Map<int, Question> uniqueQuestions = {};
+      final Map<int, List<Question>> tempQuestionsByDay = {
+        1: [], 
+        2: [], 
+        3: [], 
+        4: [],
+        5: [], 
+        6: [], 
+        7: [], 
+      };
+
+      final now = DateTime.now();
+      for (int i = 1; i <= 7; i++) {
+        final testDate = DateTime(now.year, now.month, i);
+        final weekDay = testDate.weekday;
+        
+        final data = await DBPostgres().DBGetQuestionsByAssignment(
+          patientId: widget.patientId,
+          weekDay: weekDay,
+        );
+
+        for (final row in data) {
+          final question = Question(
+            row[0],
+            row[1],
+            row[2],
+            row[3],
+          );
+          
+          if (question.dateLeavingQuestion == null) {
+            if (!uniqueQuestions.containsKey(question.codQuestion)) {
+              uniqueQuestions[question.codQuestion] = question;
+            }
+
+            tempQuestionsByDay[weekDay]!.add(question);
+          }
+        }
+      }
+
+      tempQuestionsByDay.forEach((day, questions) {
+        final Map<int, Question> uniqueInDay = {};
+        for (var q in questions) {
+          uniqueInDay[q.codQuestion] = q;
+        }
+        tempQuestionsByDay[day] = uniqueInDay.values.toList()
+          ..sort((a, b) => a.desQuestion.compareTo(b.desQuestion));
+      });
+
+      setState(() {
+        allPatientQuestions = uniqueQuestions.values.toList()
+          ..sort((a, b) => a.desQuestion.compareTo(b.desQuestion));
+        questionsByDay = tempQuestionsByDay;
+      });
+
+      print('Preguntas activas del paciente: ${allPatientQuestions?.length}');
+      print('Preguntas por día: ${questionsByDay.length}');
+      
+    } catch (e) {
+      print('Error cargando preguntas activas: $e');
+    } finally {
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadAnswers(DateTime startDate, DateTime endDate) async {
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      answersByDay.clear();
+
+      if (allPatientQuestions == null || allPatientQuestions!.isEmpty) {
+        setState(() {
+          loading = false;
+        });
+        return;
+      }
+
+      for (int i = 0; i < 7; i++) {
+        final currentDay = startDate.add(Duration(days: i));
+        final dayKey = DateFormat('yyyy-MM-dd').format(currentDay);
+        final weekDay = currentDay.weekday; 
+        final dayQuestions = questionsByDay[weekDay] ?? [];
+        final dayAnswers = await InfluxDBService().getPatientAnswers(
+          widget.patientId,
+          currentDay,
+        );
+
+        final Map<int, int> answersForDay = {};
+        
+        for (final question in dayQuestions) {
+          answersForDay[question.codQuestion] = -1;
+        }
+
+        dayAnswers.forEach((questionId, answer) {
+          if (answersForDay.containsKey(questionId)) { 
+            if (answer == '1') {
+              answersForDay[questionId] = 1;
+            } else if (answer == '0') {
+              answersForDay[questionId] = 0;
+            }
+          }
+        });
+
+        answersByDay[dayKey] = answersForDay;
+      }
+
+      print('Respuestas cargadas para ${answersByDay.length} días');
+      
+    } catch (e) {
+      print('Error cargando respuestas: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+    }
   }
 
   Future<void> _selectedDate() async {
@@ -126,345 +177,234 @@ class _PreguntasPacienteScreenState extends State<PreguntasPacienteScreen> {
       ),
     );
 
-    if (date != null) {
+    if (date != null && mounted) {
+      final monday = date.subtract(Duration(days: date.weekday - 1));
+      final sunday = monday.add(const Duration(days: 6));
+
       setState(() {
         selectedDate = date;
-        questionsByDateList = null;
-        loading = true;
-        showAllQuestions = false;
+        weekStart = monday;
+        weekEnd = sunday;
       });
 
-      await getQuestionsByDate(date);
-      await loadAnswers();
-
-      setState(() {
-        loading = false;
-      });
+      await _loadAnswers(monday, sunday);
     }
   }
 
-  Future<void> loadAnswers() async {
-    questionAnswersMap = await InfluxDBService().getPatientAnswers(
-      widget.pacienteId,
-      selectedDate!,
-    );
-    setState(() {});
-  }
+  List<ScatterSpot> _buildScatterSpots() {
+    if (allPatientQuestions == null || 
+        allPatientQuestions!.isEmpty || 
+        answersByDay.isEmpty) {
+      return [];
+    }
 
-  Future<void> loadAllQuestions() async {
-    setState(() {
-      showAllQuestions = true;
-      loading = true;
-      uniqueQuestionsMap.clear();
-    });
+    List<ScatterSpot> spots = [];
+    
+    // Mapa para llevar el índice Y de cada pregunta en cada día
+    Map<int, Map<int, int>> questionIndexByDay = {};
 
-    try {
-      final now = DateTime.now();
-      for (int i = 0; i < 30; i++) {
-        final date = now.subtract(Duration(days: i));
-        await getQuestionsByDate(date);
+    // Inicializar el mapa de índices
+    for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
+      final currentDay = weekStart!.add(Duration(days: dayIndex));
+      final weekDay = currentDay.weekday;
+      final dayQuestions = questionsByDay[weekDay] ?? [];
+      
+      questionIndexByDay[dayIndex] = {};
+      for (int qIndex = 0; qIndex < dayQuestions.length; qIndex++) {
+        final question = dayQuestions[qIndex];
+        questionIndexByDay[dayIndex]![question.codQuestion] = qIndex;
       }
+    }
 
-      for (int i = 1; i <= 7; i++) {
-        final date = now.add(Duration(days: i));
-        await getQuestionsByDate(date);
-      }
+    for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
+      final currentDay = weekStart!.add(Duration(days: dayIndex));
+      final dayKey = DateFormat('yyyy-MM-dd').format(currentDay);
+      final weekDay = currentDay.weekday;
+      final dayQuestions = questionsByDay[weekDay] ?? [];
+      final dayAnswers = answersByDay[dayKey] ?? {};
 
-      final inactiveResult = await DBPostgres().DBGetInactiveQuestions();
+      for (int qIndex = 0; qIndex < dayQuestions.length; qIndex++) {
+        final question = dayQuestions[qIndex];
+        final answer = dayAnswers[question.codQuestion] ?? -1;
 
-      if (inactiveResult is List) {
-        for (var row in inactiveResult) {
-          final codQuestion = row[0];
-          final desQuestion = row[1];
-          final dischargeDate = row[2];
-          final dateLeaving = row[3];
-
-          if (!uniqueQuestionsMap.containsKey(codQuestion)) {
-            uniqueQuestionsMap[codQuestion] = {
-              'codQuestion': codQuestion,
-              'desQuestion': desQuestion,
-              'dischargeDateQuestion': dischargeDate,
-              'dateLeavingQuestion': dateLeaving,
-              'days': <int>{}, 
-            };
-          } else {
-            uniqueQuestionsMap[codQuestion]!['dateLeavingQuestion'] =
-                dateLeaving;
-          }
+        Color color;
+        if (answer == 1) {
+          color = Colors.green;
+        } else if (answer == 0) {
+          color = Colors.red;
+        } else {
+          color = Colors.grey;
         }
+
+        spots.add(
+          ScatterSpot(
+            dayIndex.toDouble(),
+            qIndex.toDouble(),
+            dotPainter: FlDotCirclePainter(
+              color: color,
+              radius: answer == -1 ? 6 : 8,
+              strokeWidth: answer == -1 ? 1 : 0,
+              strokeColor: Colors.grey.shade400,
+            ),
+          ),
+        );
       }
-    } catch (e) {
-      print('Error cargando todas las preguntas: $e');
-    } finally {
-      setState(() {
-        loading = false;
-      });
     }
+
+    return spots;
   }
 
-  Future<void> _activarPregunta(
-    BuildContext context,
-    bool isSpanish,
-    Map<String, dynamic> question,
-  ) async {
-    try {
-      await DBPostgres().DBActivateQuestion(question['codQuestion']);
+  int _getMaxQuestionsForDay(int dayIndex) {
+    final currentDay = weekStart!.add(Duration(days: dayIndex));
+    final weekDay = currentDay.weekday;
+    return questionsByDay[weekDay]?.length ?? 0;
+  }
 
-      // Recargar datos
-      await loadAllQuestions();
-      await getQuestionsByDate(selectedDate!);
-
-      setState(() {});
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.green,
-          content: Text(
-            isSpanish
-                ? 'Pregunta activada correctamente'
-                : 'Question successfully activated',
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red,
-          content: Text(
-            isSpanish
-                ? 'Error al activar la pregunta'
-                : 'Error activating question',
-          ),
-        ),
-      );
+  Question? _getQuestionForDayAndIndex(int dayIndex, int qIndex) {
+    final currentDay = weekStart!.add(Duration(days: dayIndex));
+    final weekDay = currentDay.weekday;
+    final dayQuestions = questionsByDay[weekDay] ?? [];
+    if (qIndex >= 0 && qIndex < dayQuestions.length) {
+      return dayQuestions[qIndex];
     }
+    return null;
   }
 
   @override
   void initState() {
     super.initState();
-    selectedDate = DateTime.now();
-    getData();
-    getQuestionsByDate(selectedDate!).then((_) {
-      loadAnswers();
+    
+    loadPatientActiveQuestions().then((_) {
+      final now = DateTime.now();
+      selectedDate = now;
+      weekStart = now.subtract(Duration(days: now.weekday - 1));
+      weekEnd = weekStart!.add(const Duration(days: 6));
+      
+      if (allPatientQuestions != null && allPatientQuestions!.isNotEmpty) {
+        _loadAnswers(weekStart!, weekEnd!);
+      }
     });
   }
 
-  String _getDayName(int day, bool isSpanish) {
+  String _getDayNameShort(int dayIndex, bool isSpanish) {
     if (isSpanish) {
-      const dias = [
-        'Lunes',
-        'Martes',
-        'Miércoles',
-        'Jueves',
-        'Viernes',
-        'Sábado',
-        'Domingo',
-      ];
-      return dias[day - 1];
-    } else {
-      const days = [
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-        'Sunday',
-      ];
-      return days[day - 1];
-    }
-  }
-
-  String _getDayNameShort(int day, bool isSpanish) {
-    if (isSpanish) {
-      const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-      return dias[day - 1];
+      const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+      return days[dayIndex];
     } else {
       const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return days[day - 1];
+      return days[dayIndex];
     }
   }
 
-  String _getDaysList(Set<int> days, bool isSpanish) {
-    if (days.isEmpty)
-      return isSpanish ? 'Sin días asignados' : 'No days assigned';
-
-    List<String> dayNames = days
-        .map((d) => _getDayNameShort(d, isSpanish))
-        .toList();
-    dayNames.sort();
-
-    if (dayNames.length > 3) {
-      return '${dayNames.sublist(0, 3).join(', ')}...';
+  String _getDayName(int dayIndex, bool isSpanish) {
+    if (isSpanish) {
+      const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+      return days[dayIndex];
+    } else {
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      return days[dayIndex];
     }
-    return dayNames.join(', ');
   }
 
   @override
-Widget build(BuildContext context) {
-  final isSpanish =
-      FlutterLocalization.instance.currentLocale?.languageCode == 'es';
-  final formatoFecha = DateFormat('dd/MM/yyyy');
-
-  return WillPopScope(
-    onWillPop: () async {
-      Navigator.pop(context);
-      return false;
-    },
-    child: Scaffold(
-      endDrawer: const NavBarCaregiver(),
-      
+  Widget build(BuildContext context) {
+    final isSpanish = FlutterLocalization.instance.currentLocale?.languageCode == 'es';
+    final formatoFecha = DateFormat('dd/MM/yyyy');
+    
+    return Scaffold(
       appBar: AppBar(
-        backgroundColor: colorPrimario,
         centerTitle: true,
+        backgroundColor: colorPrimario,
         elevation: 4,
         shadowColor: Colors.black.withOpacity(0.5),
         iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          isSpanish ? 'Preguntas' : 'Questions',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          isSpanish ? 'Estadísticas de Preguntas' : 'Question Statistics',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
         ),
-        actions: [
-          // Botón de estadísticas
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.query_stats_rounded, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ScreenQuestionStatisticsScreen(
-                      patientId: widget.pacienteId,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          // Botón de menú 
-          Builder(
-            builder: (context) => Container(
-              margin: const EdgeInsets.only(right: 8),
-              child: IconButton(
-                icon: const Icon(Icons.menu, color: Colors.white),
-                onPressed: () {
-                  Scaffold.of(context).openEndDrawer();
-                },
-              ),
-            ),
-          ),
-        ],
       ),
-      
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.white, Colors.grey.shade50],
+            colors: [
+              Colors.white,
+              Colors.grey.shade50,
+            ],
           ),
         ),
-        child: Padding(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            showAllQuestions = false;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: !showAllQuestions
-                                ? colorPrimario
-                                : Colors.transparent,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(16),
-                              bottomLeft: Radius.circular(16),
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              isSpanish ? 'Por fecha' : 'By date',
-                              style: TextStyle(
-                                color: !showAllQuestions
-                                    ? Colors.white
-                                    : Colors.grey.shade700,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                    Row(
+                      children: [
+                        Icon(Icons.assessment, color: colorPrimario, size: 24),
+                        const SizedBox(width: 10),
+                        Text(
+                          isSpanish 
+                            ? 'Estadísticas por semana'
+                            : 'Weekly statistics',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.blueGrey[800],
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          if (!showAllQuestions) {
-                            loadAllQuestions();
-                          } else {
-                            setState(() {
-                              showAllQuestions = true;
-                            });
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: showAllQuestions
-                                ? colorPrimario
-                                : Colors.transparent,
-                            borderRadius: const BorderRadius.only(
-                              topRight: Radius.circular(16),
-                              bottomRight: Radius.circular(16),
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              isSpanish ? 'Todas' : 'All',
-                              style: TextStyle(
-                                color: showAllQuestions
-                                    ? Colors.white
-                                    : Colors.grey.shade700,
-                                fontWeight: FontWeight.w600,
+                    const SizedBox(height: 8),
+                  
+                    GestureDetector(
+                      onTap: _selectedDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_month, color: colorPrimario, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                weekStart != null && weekEnd != null
+                                    ? '${formatoFecha.format(weekStart!)} - ${formatoFecha.format(weekEnd!)}'
+                                    : isSpanish ? 'Seleccionar semana' : 'Select week',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
-                          ),
+                            const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                          ],
                         ),
                       ),
                     ),
@@ -472,15 +412,61 @@ Widget build(BuildContext context) {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              if (!showAllQuestions) ...[
+              if (allPatientQuestions == null || allPatientQuestions!.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(40),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: colorPrimario.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.info_outline, size: 40, color: colorPrimario),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        isSpanish 
+                          ? 'Este paciente no tiene preguntas activas'
+                          : 'This patient has no active questions',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isSpanish
+                          ? 'Asigne preguntas desde la pantalla anterior'
+                          : 'Assign questions from the previous screen',
+                        style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                // Gráfico
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.03),
@@ -494,14 +480,12 @@ Widget build(BuildContext context) {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.calendar_today,
-                            color: colorPrimario,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
+                          Icon(Icons.scatter_plot, color: colorPrimario, size: 24),
+                          const SizedBox(width: 10),
                           Text(
-                            isSpanish ? 'Seleccionar fecha' : 'Select date',
+                            isSpanish 
+                              ? 'Distribución de respuestas por día'
+                              : 'Response distribution by day',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -510,1396 +494,296 @@ Widget build(BuildContext context) {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 400,
+                        child: Stack(
+                          children: [
+                            ScatterChart(
+                              ScatterChartData(
+                                gridData: FlGridData(
+                                  show: true,
+                                  drawVerticalLine: true,
+                                  drawHorizontalLine: true,
+                                  horizontalInterval: 1,
+                                  verticalInterval: 1,
+                                  getDrawingHorizontalLine: (value) {
+                                    return FlLine(
+                                      color: Colors.grey.shade300,
+                                      strokeWidth: 1,
+                                    );
+                                  },
+                                  getDrawingVerticalLine: (value) {
+                                    return FlLine(
+                                      color: Colors.grey.shade300,
+                                      strokeWidth: 1,
+                                    );
+                                  },
+                                ),
+                                borderData: FlBorderData(
+                                  show: true,
+                                  border: Border.all(color: Colors.grey.shade400),
+                                ),
+                                titlesData: FlTitlesData(
+                                  leftTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      interval: 1,
+                                      reservedSize: 40,
+                                      getTitlesWidget: (value, meta) {
+                                        int index = value.toInt();
+                                        return Padding(
+                                          padding: const EdgeInsets.only(right: 8),
+                                          child: Text(
+                                            'P${index + 1}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.grey.shade700,
+                                            ),
+                                            textAlign: TextAlign.right,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  bottomTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      interval: 1,
+                                      reservedSize: 30,
+                                      getTitlesWidget: (value, meta) {
+                                        int dayIndex = value.toInt();
+                                        if (dayIndex >= 0 && dayIndex < 7) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(top: 8),
+                                            child: Text(
+                                              _getDayNameShort(dayIndex, isSpanish),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.grey.shade700,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        return const Text('');
+                                      },
+                                    ),
+                                  ),
+                                  topTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  rightTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                ),
+                                scatterSpots: _buildScatterSpots(),
+                                minX: -0.5,
+                                maxX: 6.5,
+                                minY: -0.5,
+                                maxY: _getMaxY(),
+                              ),
+                            ),
+                            if (loading)
+                              Container(
+                                color: Colors.white.withOpacity(0.7),
+                                child: const Center(
+                                  child: CircularProgressIndicator(color: Color.fromARGB(255, 25, 144, 234)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 12),
-                      GestureDetector(
-                        onTap: _selectedDate,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
+                      // Leyenda de colores
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildLegendItem(Colors.green, isSpanish ? 'Sí' : 'Yes'),
+                          const SizedBox(width: 20),
+                          _buildLegendItem(Colors.red, isSpanish ? 'No' : 'No'),
+                          const SizedBox(width: 20),
+                          _buildLegendItem(Colors.grey, isSpanish ? 'Sin respuesta' : 'No answer', true),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 20),
+
+              // Información de preguntas por día
+              if (allPatientQuestions != null && allPatientQuestions!.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, color: colorPrimario, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            isSpanish ? 'Preguntas por día' : 'Questions by day',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blueGrey[800],
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Lista de días con sus preguntas
+                      ...List.generate(7, (dayIndex) {
+                        final currentDay = weekStart!.add(Duration(days: dayIndex));
+                        final weekDay = currentDay.weekday;
+                        final dayQuestions = questionsByDay[weekDay] ?? [];
+                        
+                        if (dayQuestions.isEmpty) return const SizedBox.shrink();
+                        
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade50,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_month,
-                                color: colorPrimario,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                formatoFecha.format(selectedDate!),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorPrimario.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Text(
-                    '${isSpanish ? 'Preguntas del' : 'Questions for'}: ${formatoFecha.format(selectedDate!)}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: colorPrimario,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              if (showAllQuestions)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorPrimario.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      isSpanish ? 'Todas las preguntas' : 'All questions',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: colorPrimario,
-                      ),
-                    ),
-                  ),
-                ),
-
-              if (loading)
-                const Expanded(
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: Color.fromARGB(255, 25, 144, 234),
-                    ),
-                  ),
-                )
-              else if (showAllQuestions)
-                _buildAllQuestionsView(isSpanish)
-              else if (questionsByDateList == null)
-                Expanded(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 60,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          isSpanish
-                              ? 'No hay preguntas para esta fecha'
-                              : 'No questions for this date',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                Expanded(
-                  child: questionsByDateList!.isEmpty
-                      ? Center(
                           child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                Icons.info_outline,
-                                size: 60,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                isSpanish
-                                    ? 'No hay preguntas para esta fecha'
-                                    : 'No questions for this date',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: questionsByDateList!.length,
-                          itemBuilder: (context, index) {
-                            final question = questionsByDateList![index];
-                            final answer =
-                                questionAnswersMap[question.codQuestion];
-
-                            Color answerColor;
-                            String answerText;
-
-                            if (answer == '1') {
-                              answerColor = Colors.green;
-                              answerText = isSpanish ? 'Sí' : 'Yes';
-                            } else if (answer == '0') {
-                              answerColor = Colors.red;
-                              answerText = isSpanish ? 'No' : 'No';
-                            } else {
-                              answerColor = Colors.grey.shade600;
-                              answerText = isSpanish
-                                  ? 'Sin respuesta'
-                                  : 'No answer';
-                            }
-
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.03),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: colorPrimario.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      _getDayName(dayIndex, isSpanish),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: colorPrimario,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${dayQuestions.length} ${isSpanish ? 'preguntas' : 'questions'}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade600,
+                                    ),
                                   ),
                                 ],
                               ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () async {
-                                    final opcion = await showDialog<String>(
-                                      context: context,
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                          ),
-                                          title: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.warning_amber_rounded,
-                                                color: Colors.orange,
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Text(
-                                                isSpanish
-                                                    ? '¿Qué deseas hacer?'
-                                                    : 'What do you want to do?',
-                                              ),
-                                            ],
-                                          ),
-                                          content: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              ListTile(
-                                                leading: Container(
-                                                  padding: const EdgeInsets.all(
-                                                    8,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.orange
-                                                        .withOpacity(0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.today,
-                                                    color: Colors.orange,
-                                                  ),
-                                                ),
-                                                title: Text(
-                                                  isSpanish
-                                                      ? 'Desactivar solo para hoy'
-                                                      : 'Deactivate only for today',
-                                                ),
-                                                subtitle: Text(
-                                                  isSpanish
-                                                      ? 'La pregunta no aparecerá el día ${_getDayName(selectedDate!.weekday, isSpanish)}'
-                                                      : 'The question will not appear on ${_getDayName(selectedDate!.weekday, isSpanish)}',
-                                                ),
-                                                onTap: () {
-                                                  Navigator.pop(context, 'day');
-                                                },
-                                              ),
-                                              const Divider(),
-                                              ListTile(
-                                                leading: Container(
-                                                  padding: const EdgeInsets.all(
-                                                    8,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.red
-                                                        .withOpacity(0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.block,
-                                                    color: Colors.red,
-                                                  ),
-                                                ),
-                                                title: Text(
-                                                  isSpanish
-                                                      ? 'Desactivar permanentemente'
-                                                      : 'Deactivate permanently',
-                                                ),
-                                                subtitle: Text(
-                                                  isSpanish
-                                                      ? 'La pregunta se desactivará para todos los días'
-                                                      : 'The question will be deactivated for all days',
-                                                ),
-                                                onTap: () {
-                                                  Navigator.pop(
-                                                    context,
-                                                    'permanent',
-                                                  );
-                                                },
-                                              ),
-                                            ],
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(
-                                                context,
-                                                'cancel',
-                                              ),
-                                              child: Text(
-                                                isSpanish
-                                                    ? 'Cancelar'
-                                                    : 'Cancel',
-                                                style: const TextStyle(
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    );
-
-                                    if (opcion == 'day') {
-                                      // Desactivar solo para hoy
-                                      await DBPostgres()
-                                          .dbDeactivateQuestionForDay(
-                                            codUsuario: widget.pacienteId,
-                                            codPregunta: question.codQuestion,
-                                            diaSemana: selectedDate!.weekday,
-                                          );
-
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            isSpanish
-                                                ? 'Pregunta desactivada para el día ${_getDayName(selectedDate!.weekday, isSpanish)}'
-                                                : 'Question deactivated for ${_getDayName(selectedDate!.weekday, isSpanish)}',
-                                          ),
-                                          backgroundColor: Colors.orange,
-                                          duration: const Duration(seconds: 2),
-                                        ),
-                                      );
-                                    } else if (opcion == 'permanent') {
-                                      // Desactivar permanentemente
-                                      await DBPostgres().DBDeactivateQuestion(
-                                        question.codQuestion,
-                                      );
-
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            isSpanish
-                                                ? 'Pregunta desactivada permanentemente'
-                                                : 'Question permanently deactivated',
-                                          ),
-                                          backgroundColor: Colors.red,
-                                          duration: const Duration(seconds: 2),
-                                        ),
-                                      );
-                                    }
-
-                                    // Recargar datos
-                                    await getQuestionsByDate(selectedDate!);
-                                    await loadAllQuestions();
-                                    setState(() {});
-                                  },
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 50,
-                                          height: 50,
-                                          decoration: BoxDecoration(
-                                            color: answerColor.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: Icon(
-                                            answer == '1'
-                                                ? Icons.check_circle
-                                                : answer == '0'
-                                                ? Icons.cancel
-                                                : Icons.help_outline,
-                                            color: answerColor,
-                                            size: 30,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                question.desQuestion,
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '${isSpanish ? 'Respuesta' : 'Answer'}: $answerText',
-                                                style: TextStyle(
-                                                  color: answerColor,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    ),
-    );
-  }
-
-  Widget _buildAllQuestionsView(bool isSpanish) {
-    if (uniqueQuestionsMap.isEmpty) {
-      return Expanded(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: colorPrimario.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.help_outline, size: 50, color: colorPrimario),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                isSpanish
-                    ? 'No hay preguntas configuradas'
-                    : 'No questions configured',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                isSpanish
-                    ? 'Prueba a seleccionar diferentes fechas'
-                    : 'Try selecting different dates',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final questionsList = uniqueQuestionsMap.values.toList()
-      ..sort((a, b) {
-        // Primero las activas, luego las inactivas
-        bool aActive = a['dateLeavingQuestion'] == null;
-        bool bActive = b['dateLeavingQuestion'] == null;
-        if (aActive && !bActive) return -1;
-        if (!aActive && bActive) return 1;
-        return (a['desQuestion'] as String).compareTo(
-          b['desQuestion'] as String,
-        );
-      });
-
-    return Expanded(
-      child: ListView.builder(
-        physics: const BouncingScrollPhysics(),
-        itemCount: questionsList.length,
-        itemBuilder: (context, index) {
-          final question = questionsList[index];
-          final days = question['days'] as Set<int>;
-
-          // Determinar si la pregunta está activa o inactiva
-          final isActive = question['dateLeavingQuestion'] == null;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            question['desQuestion'],
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: isActive
-                                  ? Colors.black
-                                  : Colors.grey.shade500,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? Colors.green.withOpacity(0.1)
-                                : Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isActive ? Colors.green : Colors.red,
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            isActive
-                                ? (isSpanish ? 'Activa' : 'Active')
-                                : (isSpanish ? 'Inactiva' : 'Inactive'),
-                            style: TextStyle(
-                              color: isActive ? Colors.green : Colors.red,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? colorPrimario.withOpacity(0.1)
-                                : Colors.orange.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: GestureDetector(
-                            onTap: () {
-                              if (isActive) {
-                                // Si está activa, la editamos
-                                _editQuestion(
-                                  context,
-                                  isSpanish,
-                                  question,
-                                  days,
-                                );
-                              } else {
-                                // Si está inactiva, la activamos
-                                _activarPregunta(context, isSpanish, question);
-                              }
-                            },
-                            child: Icon(
-                              isActive ? Icons.edit : Icons.refresh,
-                              size: 16,
-                              color: isActive ? colorPrimario : Colors.orange,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          size: 16,
-                          color: isActive
-                              ? colorPrimario
-                              : Colors.grey.shade400,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${isSpanish ? 'Días' : 'Days'}:',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isActive
-                                ? Colors.grey.shade700
-                                : Colors.grey.shade400,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: days.isEmpty
-                              ? Text(
-                                  isSpanish
-                                      ? 'Sin días asignados'
-                                      : 'No days assigned',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: isActive
-                                        ? Colors.grey.shade500
-                                        : Colors.grey.shade400,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                )
-                              : Text(
-                                  _getDaysList(days, isSpanish),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: isActive
-                                        ? Colors.grey.shade700
-                                        : Colors.grey.shade400,
-                                  ),
-                                ),
-                        ),
-                      ],
-                    ),
-                    if (days.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: days.map((day) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isActive
-                                  ? colorPrimario.withOpacity(0.1)
-                                  : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _getDayNameShort(day, isSpanish),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isActive
-                                    ? colorPrimario
-                                    : Colors.grey.shade500,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                    // Si está inactiva, mostrar la fecha de desactivación
-                    if (!isActive &&
-                        question['dateLeavingQuestion'] != null) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.event_busy,
-                            size: 14,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${isSpanish ? 'Desactivada el' : 'Deactivated on'}: ${DateFormat('dd/MM/yyyy').format(question['dateLeavingQuestion'])}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade500,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _editQuestion(
-    BuildContext context,
-    bool isSpanish,
-    Map<String, dynamic> question,
-    Set<int> currentDays,
-  ) async {
-    await getData();
-
-    List<int> selectedDays = currentDays.toList();
-    String editedDescription = question['desQuestion'];
-
-    TextEditingController descriptionController = TextEditingController(
-      text: editedDescription,
-    );
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.9,
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.8,
-                ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Título (fijo)
-                    Row(
-                      children: [
-                        Icon(Icons.edit, color: colorPrimario, size: 28),
-                        const SizedBox(width: 10),
-                        Text(
-                          isSpanish ? 'Editar pregunta' : 'Edit question',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Contenido desplazable
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Campo de texto
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade50,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: TextFormField(
-                                controller: descriptionController,
-                                maxLines: 3,
-                                decoration: InputDecoration(
-                                  labelText: isSpanish
-                                      ? 'Descripción de la pregunta'
-                                      : 'Question description',
-                                  labelStyle: TextStyle(
-                                    color: Colors.grey.shade600,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 16,
-                                  ),
-                                ),
-                                onChanged: (value) {
-                                  editedDescription = value;
-                                },
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // Selector de días
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade50,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        left: 8,
-                                        top: 8,
-                                        bottom: 8,
-                                      ),
-                                      child: Text(
-                                        isSpanish
-                                            ? 'Selecciona los días de la semana:'
-                                            : 'Select week days:',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey.shade700,
-                                        ),
-                                      ),
-                                    ),
-                                    ...weekDays.map((day) {
-                                      bool isSelected = selectedDays.contains(
-                                        day['id'],
-                                      );
-                                      return CheckboxListTile(
-                                        title: Text(
-                                          isSpanish
-                                              ? day['name_es']
-                                              : day['name_en'],
-                                        ),
-                                        value: isSelected,
-                                        activeColor: colorPrimario,
-                                        onChanged: (bool? value) {
-                                          setState(() {
-                                            if (value == true) {
-                                              selectedDays.add(day['id']);
-                                            } else {
-                                              selectedDays.remove(day['id']);
-                                            }
-                                          });
-                                        },
-                                      );
-                                    }).toList(),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Botones (fijos al final)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 50,
-                            child: TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text(
-                                isSpanish ? 'Cancelar' : 'Cancel',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: SizedBox(
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                if (editedDescription.isNotEmpty &&
-                                    selectedDays.isNotEmpty) {
-                                  await DBPostgres()
-                                      .DBUpdateQuestionDescription(
-                                        question['codQuestion'],
-                                        editedDescription,
-                                      );
-
-                                  for (int dia in currentDays) {
-                                    await DBPostgres()
-                                        .dbDeactivateQuestionForDay(
-                                          codUsuario: widget.pacienteId,
-                                          codPregunta: question['codQuestion'],
-                                          diaSemana: dia,
-                                        );
-                                  }
-
-                                  await DBPostgres().dbAssignQuestionPatient(
-                                    codUsuario: widget.pacienteId,
-                                    codPregunta: question['codQuestion'],
-                                    diasSeleccionados: selectedDays,
-                                  );
-
-                                  await loadAllQuestions();
-                                  await getQuestionsByDate(selectedDate!);
-
-                                  setState(() {});
-                                  Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: Colors.green,
-                                      content: Text(
-                                        isSpanish
-                                            ? 'Pregunta actualizada correctamente'
-                                            : 'Question successfully updated',
-                                      ),
-                                    ),
-                                  );
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: Colors.red,
-                                      content: Text(
-                                        isSpanish
-                                            ? 'Por favor completa todos los campos.'
-                                            : 'Please fill all fields.',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: colorPrimario,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                isSpanish ? 'Guardar' : 'Save',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _addQuestion(BuildContext context, bool isSpanish) async {
-    await getData();
-
-    // Variables para el modo "Crear nueva"
-    bool isCreatingNew = false;
-    String newQuestionText = '';
-    List<int> selectedDays = [];
-    Question? selectQuestion;
-
-    // Controlador para el campo de texto de nueva pregunta
-    TextEditingController newQuestionController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.9,
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.8,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Título (fijo)
-                      Row(
-                        children: [
-                          Icon(Icons.add_task, color: colorPrimario, size: 28),
-                          const SizedBox(width: 10),
-                          Text(
-                            isSpanish ? 'Asignar pregunta' : 'Assign question',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Switch (fijo)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    isCreatingNew = false;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: !isCreatingNew
-                                        ? colorPrimario
-                                        : Colors.transparent,
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(16),
-                                      bottomLeft: Radius.circular(16),
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      isSpanish ? 'Existente' : 'Existing',
-                                      style: TextStyle(
-                                        color: !isCreatingNew
-                                            ? Colors.white
-                                            : Colors.grey.shade700,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    isCreatingNew = true;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isCreatingNew
-                                        ? colorPrimario
-                                        : Colors.transparent,
-                                    borderRadius: const BorderRadius.only(
-                                      topRight: Radius.circular(16),
-                                      bottomRight: Radius.circular(16),
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      isSpanish ? 'Nueva' : 'New',
-                                      style: TextStyle(
-                                        color: isCreatingNew
-                                            ? Colors.white
-                                            : Colors.grey.shade700,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Contenido desplazable
-                      Expanded(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!isCreatingNew) ...[
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: Colors.grey.shade200,
-                                    ),
-                                  ),
-                                  child: DropdownButtonFormField<Question>(
-                                    value: selectQuestion,
-                                    items: questionsList?.map((question) {
-                                      return DropdownMenuItem(
-                                        value: question,
-                                        child: SizedBox(
-                                          width: 200,
-                                          child: Text(
-                                            question.desQuestion,
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                    onChanged: (valor) {
-                                      selectQuestion = valor;
-                                    },
-                                    decoration: InputDecoration(
-                                      labelText: isSpanish
-                                          ? 'Selecciona una pregunta'
-                                          : 'Select a question',
-                                      labelStyle: TextStyle(
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      border: InputBorder.none,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 8,
-                                          ),
-                                    ),
-                                  ),
-                                ),
-                              ] else ...[
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: Colors.grey.shade200,
-                                    ),
-                                  ),
-                                  child: TextFormField(
-                                    controller: newQuestionController,
-                                    maxLines: 3,
-                                    decoration: InputDecoration(
-                                      labelText: isSpanish
-                                          ? 'Escribe la nueva pregunta'
-                                          : 'Write the new question',
-                                      labelStyle: TextStyle(
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      border: InputBorder.none,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 16,
-                                          ),
-                                    ),
-                                    onChanged: (value) {
-                                      newQuestionText = value;
-                                    },
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 16),
-
-                              // Selector de días
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade50,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: Colors.grey.shade200,
-                                  ),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                              const SizedBox(height: 8),
+                              ...dayQuestions.asMap().entries.map((qEntry) {
+                                final qIndex = qEntry.key;
+                                final question = qEntry.value;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          left: 8,
-                                          top: 8,
-                                          bottom: 8,
+                                      Container(
+                                        width: 30,
+                                        height: 20,
+                                        decoration: BoxDecoration(
+                                          color: colorPrimario.withOpacity(0.05),
+                                          borderRadius: BorderRadius.circular(10),
                                         ),
-                                        child: Text(
-                                          isSpanish
-                                              ? 'Selecciona los días de la semana:'
-                                              : 'Select week days:',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey.shade700,
+                                        child: Center(
+                                          child: Text(
+                                            '${qIndex + 1}',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: colorPrimario,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                      ...weekDays.map((day) {
-                                        bool isSelected = selectedDays.contains(
-                                          day['id'],
-                                        );
-                                        return CheckboxListTile(
-                                          title: Text(
-                                            isSpanish
-                                                ? day['name_es']
-                                                : day['name_en'],
-                                          ),
-                                          value: isSelected,
-                                          activeColor: colorPrimario,
-                                          onChanged: (bool? value) {
-                                            setState(() {
-                                              if (value == true) {
-                                                selectedDays.add(day['id']);
-                                              } else {
-                                                selectedDays.remove(day['id']);
-                                              }
-                                            });
-                                          },
-                                        );
-                                      }).toList(),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          question.desQuestion,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
+                                );
+                              }).toList(),
                             ],
                           ),
-                        ),
-                      ),
-
-                      // Botones fijos
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 50,
-                              child: TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: Text(
-                                  isSpanish ? 'Cancelar' : 'Cancel',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: SizedBox(
-                              height: 50,
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  if (isCreatingNew) {
-                                    // Validar nueva pregunta
-                                    if (newQuestionText.trim().isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          backgroundColor: Colors.red,
-                                          content: Text(
-                                            isSpanish
-                                                ? 'Por favor escribe una pregunta'
-                                                : 'Please write a question',
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    
-                                    if (selectedDays.isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          backgroundColor: Colors.red,
-                                          content: Text(
-                                            isSpanish
-                                                ? 'Por favor selecciona al menos un día'
-                                                : 'Please select at least one day',
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    
-                                    // Mostrar indicador de carga
-                                    showDialog(
-                                      context: context,
-                                      barrierDismissible: false,
-                                      builder: (context) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    );
-                                    
-                                    try {
-                                      // 1. Crear la nueva pregunta en la BD
-                                      await DBPostgres().DBAddQuestion(newQuestionText.trim());
-                                      
-                                      // 2. Obtener el ID de la pregunta recién creada
-                                      await getData(); // Recarga la lista de preguntas
-                                      
-                                      // Buscar la pregunta recién creada
-                                      Question? nuevaPregunta = questionsList?.firstWhere(
-                                        (q) => q.desQuestion == newQuestionText.trim(),
-                                      );
-                                      
-                                      if (nuevaPregunta != null) {
-                                        // 3. Asignarla con los días seleccionados
-                                        await DBPostgres().dbAssignQuestionPatient(
-                                          codUsuario: widget.pacienteId,
-                                          codPregunta: nuevaPregunta.codQuestion,
-                                          diasSeleccionados: selectedDays,
-                                        );
-                                        
-                                        // 4. Recargar datos
-                                        await getQuestionsByDate(selectedDate!);
-                                        await loadAllQuestions();
-                                        
-                                        Navigator.pop(context); // Cerrar indicador
-                                        Navigator.pop(context); // Cerrar diálogo
-                                        
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            backgroundColor: Colors.green,
-                                            content: Text(
-                                              isSpanish
-                                                  ? 'Pregunta creada y asignada correctamente'
-                                                  : 'Question created and assigned successfully',
-                                            ),
-                                          ),
-                                        );
-                                        
-                                        setState(() {});
-                                      }
-                                    } catch (e) {
-                                      Navigator.pop(context); // Cerrar indicador
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          backgroundColor: Colors.red,
-                                          content: Text(
-                                            isSpanish
-                                                ? 'Error al crear la pregunta'
-                                                : 'Error creating question',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  } else {
-                                    // Modo existente
-                                    if (selectQuestion != null && selectedDays.isNotEmpty) {
-                                      await DBPostgres().dbAssignQuestionPatient(
-                                        codUsuario: widget.pacienteId,
-                                        codPregunta: selectQuestion!.codQuestion,
-                                        diasSeleccionados: selectedDays,
-                                      );
-                                      await getQuestionsByDate(selectedDate!);
-                                      setState(() {});
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          backgroundColor: Colors.green,
-                                          content: Text(
-                                            isSpanish
-                                                ? 'Pregunta añadida correctamente'
-                                                : 'Question successfully added',
-                                          ),
-                                        ),
-                                      );
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          backgroundColor: Colors.red,
-                                          content: Text(
-                                            isSpanish
-                                                ? 'Por favor selecciona pregunta y al menos un día.'
-                                                : 'Please select a question and at least one day.',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: colorPrimario,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Text(
-                                  isSpanish ? 'Guardar' : 'Save',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        );
+                      }),
                     ],
                   ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+
+              const SizedBox(height: 30),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Calcular el máximo valor Y para el gráfico
+  double _getMaxY() {
+    double max = 0;
+    for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
+      final currentDay = weekStart!.add(Duration(days: dayIndex));
+      final weekDay = currentDay.weekday;
+      final count = questionsByDay[weekDay]?.length ?? 0;
+      if (count > max) max = count.toDouble();
+    }
+    return max - 0.5;
+  }
+
+  Widget _buildLegendItem(Color color, String label, [bool isGrey = false]) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: isGrey
+                ? Border.all(color: Colors.grey.shade400, width: 1.5)
+                : null,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
     );
   }
 }
