@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../localization/locales.dart';
 import '../Cuidador/screen_Pacientes.dart';
+import '../Paciente/screen_WearablePaciente.dart';
 import '../base_de_datos/postgres.dart';
 import '../services/Tareas.dart';
 import '../recuperar_contraseña/screen_RecuperarContrseña.dart';
@@ -183,7 +184,7 @@ class _LogInScreenState extends State<LogInScreen> {
                     
                     const SizedBox(height: 30),
                     
-                    // Campo E-Mail
+                    // Campo E-Mail (obligatorio)
                     Container(
                       decoration: BoxDecoration(
                         boxShadow: [
@@ -200,6 +201,12 @@ class _LogInScreenState extends State<LogInScreen> {
                         validator: (val) {
                           if (val == null || val.isEmpty) {
                             return LocaleData.errorField.getString(context);
+                          }
+                          // Validación básica de email
+                          if (!val.contains('@') || !val.contains('.')) {
+                            return _currentLocale == 'es'
+                                ? 'Ingresa un email válido'
+                                : 'Enter a valid email';
                           }
                           return null;
                         },
@@ -237,6 +244,7 @@ class _LogInScreenState extends State<LogInScreen> {
                     
                     const SizedBox(height: 16),
                     
+                    // Campo Password (opcional)
                     Container(
                       decoration: BoxDecoration(
                         boxShadow: [
@@ -250,13 +258,16 @@ class _LogInScreenState extends State<LogInScreen> {
                       child: TextFormField(
                         controller: passwordController,
                         obscureText: !passwordVisibility,
+                        // SIN VALIDATOR - LA CONTRASEÑA ES OPCIONAL
                         onChanged: (value) {
                           setState(() {
                             _btnActivePassword = value.isNotEmpty;
                           });
                         },
                         decoration: InputDecoration(
-                          labelText: LocaleData.inputPassword.getString(context),
+                          labelText: _currentLocale == 'es' 
+                              ? 'Contraseña (opcional)' 
+                              : 'Password (optional)',
                           hintText: '••••••••',
                           prefixIcon: Icon(Icons.lock_outline, color: colorPrimario, size: 22),
                           suffixIcon: IconButton(
@@ -288,15 +299,28 @@ class _LogInScreenState extends State<LogInScreen> {
                     
                     const SizedBox(height: 8),
                     
-                    // Olvido contraseña
+                    // Olvido contraseña (opcional, solo si se usa contraseña)
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const RecuperarContrasegnaScreen()),
-                          );
+                          if (emailController.text.isNotEmpty) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const RecuperarContrasegnaScreen()),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  _currentLocale == 'es' 
+                                      ? 'Ingresa tu email primero' 
+                                      : 'Enter your email first'
+                                ),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          }
                         },
                         style: TextButton.styleFrom(
                           foregroundColor: colorPrimario,
@@ -319,6 +343,7 @@ class _LogInScreenState extends State<LogInScreen> {
                       height: 55,
                       child: ElevatedButton(
                         onPressed: isLoading ? null : () {
+                          // Solo validamos que el email no esté vacío
                           if (emailController.text.isNotEmpty) {
                             LoginButton(emailController.text, passwordController.text);
                           } else {
@@ -430,10 +455,16 @@ class _LogInScreenState extends State<LogInScreen> {
     });
 
     try {
-      var userResponse = await DBPostgres().DBLogIn(email, password);
+      // Si la contraseña está vacía, pasamos null o string vacío
+      String passwordToSend = password.isEmpty ? '' : password;
+      var userResponse = await DBPostgres().DBLogIn(email, passwordToSend);
       
       if (userResponse == null || userResponse[1] == null || userResponse[1].isEmpty) {
-        _showErrorDialog("Usuario o contraseña incorrectos.");
+        _showErrorDialog(
+          _currentLocale == 'es' 
+              ? 'Usuario o contraseña incorrectos.' 
+              : 'Invalid username or password.'
+        );
         setState(() {
           isLoading = false;
           errorOccurred = true;
@@ -451,17 +482,28 @@ class _LogInScreenState extends State<LogInScreen> {
         ));
       }
 
-      if (userTypeFromDB == 'cuidador') {
-        SesionActual.codUsuario = usuario[0].CodUsuario;
-        SesionActual.rol = usuario[0].TipoUsuario;
-        SesionActual.email = usuario[0].Email;
-        SesionActual.nombre = usuario[0].Nombre;
+      // Verificar si la cuenta está activa o inactiva
+      if (userTypeFromDB.contains('inact')) {
+        _showInactiveAccountDialog(userTypeFromDB);
+        setState(() {
+          isLoading = false;
+          errorOccurred = true;
+        });
+        return;
+      }
 
-        // await saveLoginStatus(usuario[0].TipoUsuario, usuario[0].CodUsuario);
-        
+      // Guardar sesión
+      SesionActual.codUsuario = usuario[0].CodUsuario;
+      SesionActual.rol = usuario[0].TipoUsuario;
+      SesionActual.email = usuario[0].Email;
+      SesionActual.nombre = usuario[0].Nombre;
+
+      await saveLoginStatus(usuario[0].TipoUsuario, usuario[0].CodUsuario);
+      await saveIntegerToMemory(usuario[0].CodUsuario);
+
+      // Redireccionar según el tipo de usuario
+      if (userTypeFromDB == 'cuidador') {
         if (Platform.isAndroid || Platform.isIOS) {
-          int codUser = usuario[0].CodUsuario;
-          await saveIntegerToMemory(codUser);
           FlutterBackgroundService().invoke("setAsBackground");
         }
         
@@ -473,8 +515,32 @@ class _LogInScreenState extends State<LogInScreen> {
             MaterialPageRoute(builder: (context) => const PacientesCuidadorScreen()),
           );
         }
-      } else {
-        _showUnauthorizedDialog(userTypeFromDB);
+      } 
+      else if (userTypeFromDB == 'paciente') {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WearablePacientePacienteScreen()),
+          );
+        }
+      }
+      else if (userTypeFromDB == 'admin' || userTypeFromDB == 'superadmin') {
+        _showErrorDialog(
+          _currentLocale == 'es'
+              ? 'Acceso restringido. Esta aplicación es solo para Cuidadores y Pacientes.'
+              : 'Access restricted. This app is for Caregivers and Patients only.'
+        );
+        setState(() {
+          isLoading = false;
+          errorOccurred = true;
+        });
+      }
+      else {
+        _showErrorDialog(
+          _currentLocale == 'es'
+              ? 'Tipo de usuario no reconocido.'
+              : 'User type not recognized.'
+        );
         setState(() {
           isLoading = false;
           errorOccurred = true;
@@ -486,6 +552,11 @@ class _LogInScreenState extends State<LogInScreen> {
         errorOccurred = true;
         isLoading = false;
       });
+      _showErrorDialog(
+        _currentLocale == 'es'
+            ? 'Error al conectar con el servidor.'
+            : 'Error connecting to server.'
+      );
     }
   }
 
@@ -500,7 +571,10 @@ class _LogInScreenState extends State<LogInScreen> {
           children: [
             Icon(Icons.error, color: Colors.red),
             const SizedBox(width: 10),
-            const Text('Error', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              _currentLocale == 'es' ? 'Error' : 'Error',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Text(message),
@@ -513,9 +587,9 @@ class _LogInScreenState extends State<LogInScreen> {
                 color: colorPrimario,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Aceptar',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              child: Text(
+                _currentLocale == 'es' ? 'Aceptar' : 'Accept',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -524,7 +598,22 @@ class _LogInScreenState extends State<LogInScreen> {
     );
   }
 
-  void _showUnauthorizedDialog(String type) {
+  void _showInactiveAccountDialog(String type) {
+    String message = '';
+    if (type == 'cuidadorinact') {
+      message = _currentLocale == 'es'
+          ? 'Tu cuenta de cuidador está inactiva. Por favor, contacta con el administrador.'
+          : 'Your caregiver account is inactive. Please contact the administrator.';
+    } else if (type == 'pacienteinact') {
+      message = _currentLocale == 'es'
+          ? 'Tu cuenta de paciente está inactiva. Por favor, contacta con tu cuidador o administrador.'
+          : 'Your patient account is inactive. Please contact your caregiver or administrator.';
+    } else {
+      message = _currentLocale == 'es'
+          ? 'Tu cuenta está inactiva. Por favor, contacta con el administrador.'
+          : 'Your account is inactive. Please contact the administrator.';
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -533,17 +622,20 @@ class _LogInScreenState extends State<LogInScreen> {
         ),
         title: Row(
           children: [
-            Icon(Icons.block, color: Colors.red),
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
             const SizedBox(width: 10),
-            const Text('Acceso Denegado', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              _currentLocale == 'es' ? 'Cuenta Inactiva' : 'Inactive Account',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Esta aplicación es exclusiva para Cuidadores.'),
-            const SizedBox(height: 8),
+            Text(message),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -552,12 +644,14 @@ class _LogInScreenState extends State<LogInScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 16, color: Colors.orange),
+                  const Icon(Icons.contact_support, size: 16, color: Colors.orange),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Tu cuenta fue detectada como: "$type".',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      _currentLocale == 'es'
+                          ? 'Contacta con soporte para reactivar tu cuenta.'
+                          : 'Contact support to reactivate your account.',
+                      style: const TextStyle(fontSize: 12),
                     ),
                   ),
                 ],
@@ -574,9 +668,9 @@ class _LogInScreenState extends State<LogInScreen> {
                 color: colorPrimario,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Entendido',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              child: Text(
+                _currentLocale == 'es' ? 'Entendido' : 'Got it',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -588,9 +682,9 @@ class _LogInScreenState extends State<LogInScreen> {
 
 Future<void> saveLoginStatus(String rol, int userId) async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  // await prefs.setBool('isLoggedIn', true);
-  // await prefs.setString('rol', rol);
-  // await prefs.setInt('CodUsuario', userId);
+  await prefs.setBool('isLoggedIn', true);
+  await prefs.setString('rol', rol);
+  await prefs.setInt('CodUsuario', userId);
 }
 
 Future<void> saveIntegerToMemory(int cod) async {

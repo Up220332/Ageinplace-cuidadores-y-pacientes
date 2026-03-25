@@ -2727,7 +2727,7 @@ class _EstadisticasPageState extends State<EstadisticasPage> {
                                   ),
                                   primaryYAxis: NumericAxis(
                                     minimum: 0,
-                                    maximum: 110,
+                                    maximum: 100,
                                     labelFormat: '{value}%',
                                     axisLine: const AxisLine(width: 0),
                                     anchorRangeToVisiblePoints: _enableAnchor,

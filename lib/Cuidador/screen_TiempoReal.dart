@@ -915,7 +915,7 @@ class _TiempoRealPageState extends State<TiempoRealPage> {
 
               // Lista de eventos
               Container(
-                height: 100,
+                height: 170,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
