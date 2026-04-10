@@ -48,12 +48,12 @@ class _ADLsPageState extends State<ADLsPage> {
   List<AlarmasPaciente> AlarmasPacienteList = [];
   List<AlarmasParametrosValor> AlarmasPacienteParametroList = [];
   List<AlarmasParametrosValor> ParametrosValorList = [];
-  
+
   final colorPrimario = const Color.fromARGB(255, 25, 144, 234);
-  
+
   // Variable para idioma
   late bool isSpanish;
-  
+
   Map<String, String> adlTranslations = {
     'DORMIR': 'DORMIR',
     'DESAYUNAR': 'DESAYUNAR',
@@ -62,7 +62,7 @@ class _ADLsPageState extends State<ADLsPage> {
     'OCIO': 'OCIO',
     'ASEO': 'ASEO',
   };
-  
+
   Map<String, String> adlTranslationsEN = {
     'DORMIR': 'SLEEP',
     'DESAYUNAR': 'BREAKFAST',
@@ -71,7 +71,7 @@ class _ADLsPageState extends State<ADLsPage> {
     'OCIO': 'LEISURE',
     'ASEO': 'HYGIENE',
   };
-  
+
   Map<String, String> roomTypeTranslations = {
     'Baño': 'Bathroom',
     'Buhardilla': 'Attic',
@@ -93,7 +93,7 @@ class _ADLsPageState extends State<ADLsPage> {
     'Otros': 'Others',
     'Zona no Sensorizada': 'Non-Sensorized Area',
   };
-  
+
   final _mapController = MapController();
 
   final _sphericalMercatorProjection = proj4.Projection.add(
@@ -151,11 +151,12 @@ class _ADLsPageState extends State<ADLsPage> {
   @override
   void initState() {
     super.initState();
-    
+
     // Inicializar idioma y listener
     FlutterLocalization.instance.onTranslatedLanguage = _onLanguageChanged;
-    isSpanish = FlutterLocalization.instance.currentLocale?.languageCode == 'es';
-    
+    isSpanish =
+        FlutterLocalization.instance.currentLocale?.languageCode == 'es';
+
     getData();
   }
 
@@ -172,7 +173,7 @@ class _ADLsPageState extends State<ADLsPage> {
     FlutterLocalization.instance.onTranslatedLanguage = null;
     super.dispose();
   }
-  
+
   String translateADL(String adl) {
     if (isSpanish) {
       return adl;
@@ -180,7 +181,7 @@ class _ADLsPageState extends State<ADLsPage> {
       return adlTranslationsEN[adl] ?? adl;
     }
   }
-  
+
   String translateRoomType(String roomType) {
     if (isSpanish) {
       return roomType;
@@ -199,20 +200,20 @@ class _ADLsPageState extends State<ADLsPage> {
   TimeOfDay? _parseTimeFromString(String timeString) {
     try {
       print('Parseando hora: "$timeString"');
-      
+
       if (timeString.isEmpty) return null;
-      
+
       // Buscar el patrón TimeOfDay(14:30)
       final regex = RegExp(r'TimeOfDay\((\d{1,2}):(\d{2})\)');
       final match = regex.firstMatch(timeString);
-      
+
       if (match != null) {
         return TimeOfDay(
           hour: int.parse(match.group(1)!),
           minute: int.parse(match.group(2)!),
         );
       }
-      
+
       // Si ya viene en formato HH:mm
       if (timeString.contains(':')) {
         final partes = timeString.split(':');
@@ -253,7 +254,10 @@ class _ADLsPageState extends State<ADLsPage> {
             backgroundColor: colorPrimario,
             label: Text(
               isSpanish ? 'Agregar actividad' : 'Add activity',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             icon: const Icon(Icons.add, color: Colors.white),
             onPressed: () {
@@ -273,16 +277,30 @@ class _ADLsPageState extends State<ADLsPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.event_busy_outlined, size: 80, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.event_busy_outlined,
+                          size: 80,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 16),
                         Text(
-                          isSpanish ? 'No hay actividades configuradas' : 'No activities configured',
-                          style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+                          isSpanish
+                              ? 'No hay actividades configuradas'
+                              : 'No activities configured',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          isSpanish ? 'Añade actividades usando el botón +' : 'Add activities using the + button',
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                          isSpanish
+                              ? 'Añade actividades usando el botón +'
+                              : 'Add activities using the + button',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
                         ),
                       ],
                     ),
@@ -292,7 +310,7 @@ class _ADLsPageState extends State<ADLsPage> {
                     itemCount: AlarmasPacienteList.length,
                     itemBuilder: (context, index) {
                       final adl = AlarmasPacienteList[index];
-                      
+
                       return GestureDetector(
                         onTap: () {
                           _mostrarDesactivarADL(context, index);
@@ -332,7 +350,7 @@ class _ADLsPageState extends State<ADLsPage> {
                                 ),
                               ),
                               const SizedBox(width: 16),
-                              
+
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,12 +405,11 @@ class _ADLsPageState extends State<ADLsPage> {
         ParametrosValorList.clear();
         selectedAlarma = AlarmasPacienteList[index].Alarma;
         desAlarmaController.text = AlarmasPacienteList[index].DesAlarma;
-        ParametrosValorList =
-            AlarmasPacienteParametroList.where(
-              (parametro) =>
-                  parametro.CodAlarmaPaciente ==
-                  AlarmasPacienteList[index].CodAlarmaPaciente,
-            ).toList();
+        ParametrosValorList = AlarmasPacienteParametroList.where(
+          (parametro) =>
+              parametro.CodAlarmaPaciente ==
+              AlarmasPacienteList[index].CodAlarmaPaciente,
+        ).toList();
         Map<int, String> valoresModParametros = {};
         LatLng? selectedLatLngMod;
         List<CircleMarker> circleMarkersMod = [];
@@ -408,27 +425,32 @@ class _ADLsPageState extends State<ADLsPage> {
               double.parse(
                 ParametrosValorList.firstWhere(
                   (parametro) => parametro.Parametro == 'LATITUD',
-                  orElse: () => AlarmasParametrosValor('', '0.0', 0, 0, 'LATITUD', ''),
+                  orElse: () =>
+                      AlarmasParametrosValor('', '0.0', 0, 0, 'LATITUD', ''),
                 ).Valor,
               ),
               double.parse(
                 ParametrosValorList.firstWhere(
                   (parametro) => parametro.Parametro == 'LONGITUD',
-                  orElse: () => AlarmasParametrosValor('', '0.0', 0, 0, 'LONGITUD', ''),
+                  orElse: () =>
+                      AlarmasParametrosValor('', '0.0', 0, 0, 'LONGITUD', ''),
                 ).Valor,
               ),
             );
-            
-            double radioValor = double.tryParse(
-              ParametrosValorList.firstWhere(
-                (parametro) => parametro.Parametro == 'RADIO',
-                orElse: () => AlarmasParametrosValor('', '0', 0, 0, 'RADIO', ''),
-              ).Valor,
-            ) ?? 0;
-            
+
+            double radioValor =
+                double.tryParse(
+                  ParametrosValorList.firstWhere(
+                    (parametro) => parametro.Parametro == 'RADIO',
+                    orElse: () =>
+                        AlarmasParametrosValor('', '0', 0, 0, 'RADIO', ''),
+                  ).Valor,
+                ) ??
+                0;
+
             radioPuntoProhibidoController.text = (radioValor / 1000).toString();
             radioEnMetrosMod = radioValor;
-            
+
             circleMarkersMod = [
               CircleMarker(
                 point: selectedLatLngMod,
@@ -448,28 +470,33 @@ class _ADLsPageState extends State<ADLsPage> {
             orElse: () => AlarmasParametrosValor('', '0', 0, 0, 'DURACION', ''),
           );
           duracionController.text = parametroDuracion.Valor;
-          
+
           final parametroFrecuencia = ParametrosValorList.firstWhere(
             (parametro) => parametro.Parametro == 'FRECUENCIA',
-            orElse: () => AlarmasParametrosValor('', '0', 0, 0, 'FRECUENCIA', ''),
+            orElse: () =>
+                AlarmasParametrosValor('', '0', 0, 0, 'FRECUENCIA', ''),
           );
           frecuenciaController.text = parametroFrecuencia.Valor;
 
           final parametroHoraInicio = ParametrosValorList.firstWhere(
             (parametro) => parametro.Parametro == 'HORA INICIO',
-            orElse: () => AlarmasParametrosValor('0', '00:00', 0, 0, 'HORA INICIO', ''),
+            orElse: () =>
+                AlarmasParametrosValor('0', '00:00', 0, 0, 'HORA INICIO', ''),
           );
 
-          horaInicioMod = _parseTimeFromString(parametroHoraInicio.Valor) ?? 
-                         const TimeOfDay(hour: 0, minute: 0);
+          horaInicioMod =
+              _parseTimeFromString(parametroHoraInicio.Valor) ??
+              const TimeOfDay(hour: 0, minute: 0);
 
           final parametroHoraFin = ParametrosValorList.firstWhere(
             (parametro) => parametro.Parametro == 'HORA FIN',
-            orElse: () => AlarmasParametrosValor('', '00:00', 0, 0, 'HORA FIN', ''),
+            orElse: () =>
+                AlarmasParametrosValor('', '00:00', 0, 0, 'HORA FIN', ''),
           );
 
-          horaFinMod = _parseTimeFromString(parametroHoraFin.Valor) ?? 
-                      const TimeOfDay(hour: 0, minute: 0);
+          horaFinMod =
+              _parseTimeFromString(parametroHoraFin.Valor) ??
+              const TimeOfDay(hour: 0, minute: 0);
 
           if (horaInicioMod != null && horaFinMod != null) {
             horaFinEsMenor = _esHoraFinMenor(horaInicioMod!, horaFinMod!);
@@ -478,7 +505,8 @@ class _ADLsPageState extends State<ADLsPage> {
 
           final parametroCodHabitacionSensor = ParametrosValorList.firstWhere(
             (parametro) => parametro.Parametro == 'HABITACION',
-            orElse: () => AlarmasParametrosValor('', 'HS0', 0, 0, 'HABITACION', ''),
+            orElse: () =>
+                AlarmasParametrosValor('', 'HS0', 0, 0, 'HABITACION', ''),
           );
           codHabitacionSensorMod = parametroCodHabitacionSensor.Valor;
         }
@@ -510,7 +538,7 @@ class _ADLsPageState extends State<ADLsPage> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    
+
                     Flexible(
                       child: SingleChildScrollView(
                         child: Column(
@@ -526,16 +554,23 @@ class _ADLsPageState extends State<ADLsPage> {
                               child: TextFormField(
                                 controller: desAlarmaController,
                                 decoration: InputDecoration(
-                                  labelText: isSpanish ? 'Descripción de la actividad' : 'Activity description',
-                                  labelStyle: TextStyle(color: Colors.grey.shade600),
+                                  labelText: isSpanish
+                                      ? 'Descripción de la actividad'
+                                      : 'Activity description',
+                                  labelStyle: TextStyle(
+                                    color: Colors.grey.shade600,
+                                  ),
                                   border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
                                 ),
                               ),
                             ),
-                            
+
                             const SizedBox(height: 16),
-                            
+
                             if (mostrarAdvertenciaRangoNocturno)
                               Container(
                                 margin: const EdgeInsets.only(bottom: 12),
@@ -547,20 +582,24 @@ class _ADLsPageState extends State<ADLsPage> {
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.warning_amber, color: Colors.amber, size: 20),
+                                    Icon(
+                                      Icons.warning_amber,
+                                      color: Colors.amber,
+                                      size: 20,
+                                    ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
                                         isSpanish
-                                          ? 'La hora de fin es posterior a la de inicio. El rango de chequeo será hasta el día siguiente.'
-                                          : 'The end time is after the start time. The checking range will be until the next day.',
+                                            ? 'La hora de fin es posterior a la de inicio. El rango de chequeo será hasta el día siguiente.'
+                                            : 'The end time is after the start time. The checking range will be until the next day.',
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            
+
                             if (selectedAlarma != "RANGO DE ACCION" &&
                                 selectedAlarma != "PUNTO PROHIBIDO")
                               ...ParametrosValorList.map((parametro) {
@@ -570,16 +609,22 @@ class _ADLsPageState extends State<ADLsPage> {
                                     decoration: BoxDecoration(
                                       color: Colors.grey.shade100,
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.grey.shade300),
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                      ),
                                     ),
                                     child: DropdownButtonFormField<Habitaciones>(
                                       value: widget.HabitacionesList.firstWhere(
-                                        (habitacion) => 
-                                          habitacion.CodHabitacionSensor == codHabitacionSensorMod,
-                                        orElse: () => widget.HabitacionesList.first,
+                                        (habitacion) =>
+                                            habitacion.CodHabitacionSensor ==
+                                            codHabitacionSensorMod,
+                                        orElse: () =>
+                                            widget.HabitacionesList.first,
                                       ),
                                       items: widget.HabitacionesList.map(
-                                        (habitacion) => DropdownMenuItem<Habitaciones>(
+                                        (
+                                          habitacion,
+                                        ) => DropdownMenuItem<Habitaciones>(
                                           value: habitacion,
                                           child: Text(
                                             '${translateRoomType(habitacion.TipoHabitacion)} ${habitacion.Observaciones}',
@@ -589,37 +634,55 @@ class _ADLsPageState extends State<ADLsPage> {
                                       onChanged: (Habitaciones? value) {
                                         if (value != null) {
                                           setState(() {
-                                            valoresModParametros[parametro.CodAlarmaParametro] =
+                                            valoresModParametros[parametro
+                                                    .CodAlarmaParametro] =
                                                 value.CodHabitacionSensor!;
                                           });
                                         }
                                       },
                                       decoration: InputDecoration(
-                                        labelText: isSpanish ? 'Habitación' : 'Room',
-                                        labelStyle: TextStyle(color: Colors.grey.shade600),
+                                        labelText: isSpanish
+                                            ? 'Habitación'
+                                            : 'Room',
+                                        labelStyle: TextStyle(
+                                          color: Colors.grey.shade600,
+                                        ),
                                         border: InputBorder.none,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
                                       ),
                                     ),
                                   );
-                                } else if (parametro.Parametro == "HORA INICIO") {
+                                } else if (parametro.Parametro ==
+                                    "HORA INICIO") {
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 12),
                                     child: GestureDetector(
                                       onTap: () async {
-                                        final selectedTime = await showTimePicker(
-                                          context: context,
-                                          initialTime: horaInicioMod ?? TimeOfDay.now(),
-                                        );
+                                        final selectedTime =
+                                            await showTimePicker(
+                                              context: context,
+                                              initialTime:
+                                                  horaInicioMod ??
+                                                  TimeOfDay.now(),
+                                            );
                                         if (selectedTime != null) {
                                           setState(() {
                                             horaInicioMod = selectedTime;
-                                            valoresModParametros[parametro.CodAlarmaParametro] = 
+                                            valoresModParametros[parametro
+                                                    .CodAlarmaParametro] =
                                                 '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
-                                            
+
                                             if (horaFinMod != null) {
-                                              horaFinEsMenor = _esHoraFinMenor(horaInicioMod!, horaFinMod!);
-                                              mostrarAdvertenciaRangoNocturno = horaFinEsMenor;
+                                              horaFinEsMenor = _esHoraFinMenor(
+                                                horaInicioMod!,
+                                                horaFinMod!,
+                                              );
+                                              mostrarAdvertenciaRangoNocturno =
+                                                  horaFinEsMenor;
                                             }
                                           });
                                         }
@@ -627,18 +690,33 @@ class _ADLsPageState extends State<ADLsPage> {
                                       child: Container(
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: Colors.grey.shade300),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.grey.shade300,
+                                          ),
                                         ),
                                         child: ListTile(
-                                          leading: Icon(Icons.access_time, color: colorPrimario),
+                                          leading: Icon(
+                                            Icons.access_time,
+                                            color: colorPrimario,
+                                          ),
                                           title: Text(
-                                            isSpanish ? 'Hora de inicio' : 'Start time',
-                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                            isSpanish
+                                                ? 'Hora de inicio'
+                                                : 'Start time',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
                                           ),
                                           subtitle: Text(
-                                            horaInicioMod?.format(context) ?? '',
-                                            style: const TextStyle(fontWeight: FontWeight.w500),
+                                            horaInicioMod?.format(context) ??
+                                                '',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -649,19 +727,26 @@ class _ADLsPageState extends State<ADLsPage> {
                                     margin: const EdgeInsets.only(bottom: 12),
                                     child: GestureDetector(
                                       onTap: () async {
-                                        final selectedTime = await showTimePicker(
-                                          context: context,
-                                          initialTime: horaFinMod ?? TimeOfDay.now(),
-                                        );
+                                        final selectedTime =
+                                            await showTimePicker(
+                                              context: context,
+                                              initialTime:
+                                                  horaFinMod ?? TimeOfDay.now(),
+                                            );
                                         if (selectedTime != null) {
                                           setState(() {
                                             horaFinMod = selectedTime;
-                                            valoresModParametros[parametro.CodAlarmaParametro] = 
+                                            valoresModParametros[parametro
+                                                    .CodAlarmaParametro] =
                                                 '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
-                                            
+
                                             if (horaInicioMod != null) {
-                                              horaFinEsMenor = _esHoraFinMenor(horaInicioMod!, horaFinMod!);
-                                              mostrarAdvertenciaRangoNocturno = horaFinEsMenor;
+                                              horaFinEsMenor = _esHoraFinMenor(
+                                                horaInicioMod!,
+                                                horaFinMod!,
+                                              );
+                                              mostrarAdvertenciaRangoNocturno =
+                                                  horaFinEsMenor;
                                             }
                                           });
                                         }
@@ -669,30 +754,47 @@ class _ADLsPageState extends State<ADLsPage> {
                                       child: Container(
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: Colors.grey.shade300),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.grey.shade300,
+                                          ),
                                         ),
                                         child: ListTile(
-                                          leading: Icon(Icons.access_time, color: colorPrimario),
+                                          leading: Icon(
+                                            Icons.access_time,
+                                            color: colorPrimario,
+                                          ),
                                           title: Text(
-                                            isSpanish ? 'Hora de fin' : 'End time',
-                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                            isSpanish
+                                                ? 'Hora de fin'
+                                                : 'End time',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
                                           ),
                                           subtitle: Text(
                                             horaFinMod?.format(context) ?? '',
-                                            style: const TextStyle(fontWeight: FontWeight.w500),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   );
-                                } else if (parametro.Parametro == "FRECUENCIA") {
+                                } else if (parametro.Parametro ==
+                                    "FRECUENCIA") {
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 12),
                                     decoration: BoxDecoration(
                                       color: Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.grey.shade200),
+                                      border: Border.all(
+                                        color: Colors.grey.shade200,
+                                      ),
                                     ),
                                     child: TextFormField(
                                       controller: frecuenciaController,
@@ -701,13 +803,23 @@ class _ADLsPageState extends State<ADLsPage> {
                                         FilteringTextInputFormatter.digitsOnly,
                                       ],
                                       decoration: InputDecoration(
-                                        labelText: isSpanish ? 'Frecuencia (número de veces)' : 'Frequency (number of times)',
-                                        labelStyle: TextStyle(color: Colors.grey.shade600),
+                                        labelText: isSpanish
+                                            ? 'Frecuencia (número de veces)'
+                                            : 'Frequency (number of times)',
+                                        labelStyle: TextStyle(
+                                          color: Colors.grey.shade600,
+                                        ),
                                         border: InputBorder.none,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 16,
+                                            ),
                                       ),
                                       onChanged: (value) {
-                                        valoresModParametros[parametro.CodAlarmaParametro] = value;
+                                        valoresModParametros[parametro
+                                                .CodAlarmaParametro] =
+                                            value;
                                       },
                                     ),
                                   );
@@ -717,7 +829,7 @@ class _ADLsPageState extends State<ADLsPage> {
                                   return const SizedBox.shrink();
                                 }
                               }).toList(),
-                            
+
                             if ((selectedAlarma == "PUNTO PROHIBIDO" ||
                                 selectedAlarma == "RANGO DE ACCION"))
                               Column(
@@ -727,43 +839,66 @@ class _ADLsPageState extends State<ADLsPage> {
                                     decoration: BoxDecoration(
                                       color: Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.grey.shade200),
+                                      border: Border.all(
+                                        color: Colors.grey.shade200,
+                                      ),
                                     ),
                                     child: TextFormField(
                                       controller: radioPuntoProhibidoController,
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                            decimal: true,
+                                          ),
                                       inputFormatters: [
-                                        FilteringTextInputFormatter.allow(RegExp(r'^\d+(?:\.\d{0,2})?$')),
+                                        FilteringTextInputFormatter.allow(
+                                          RegExp(r'^\d+(?:\.\d{0,2})?$'),
+                                        ),
                                       ],
                                       onChanged: (value) {
                                         setState(() {
-                                          radioEnMetrosMod = (double.tryParse(value) ?? 0) * 1000;
-                                          
+                                          radioEnMetrosMod =
+                                              (double.tryParse(value) ?? 0) *
+                                              1000;
+
                                           if (selectedLatLngMod != null) {
                                             circleMarkersMod = [
                                               CircleMarker(
                                                 point: selectedLatLngMod!,
                                                 radius: radioEnMetrosMod,
-                                                color: Colors.blue.withOpacity(0.5),
+                                                color: Colors.blue.withOpacity(
+                                                  0.5,
+                                                ),
                                                 borderColor: colorPrimario,
                                                 borderStrokeWidth: 2,
                                                 useRadiusInMeter: true,
                                               ),
                                             ];
                                           }
-                                          
-                                          final radioParam = ParametrosValorList.firstWhere(
-                                            (parametro) => parametro.Parametro == 'RADIO',
-                                          );
-                                          valoresModParametros[radioParam.CodAlarmaParametro] =
+
+                                          final radioParam =
+                                              ParametrosValorList.firstWhere(
+                                                (parametro) =>
+                                                    parametro.Parametro ==
+                                                    'RADIO',
+                                              );
+                                          valoresModParametros[radioParam
+                                                  .CodAlarmaParametro] =
                                               radioEnMetrosMod.toString();
                                         });
                                       },
                                       decoration: InputDecoration(
-                                        labelText: isSpanish ? 'Radio (Km)' : 'Radius (Km)',
-                                        labelStyle: TextStyle(color: Colors.grey.shade600),
+                                        labelText: isSpanish
+                                            ? 'Radio (Km)'
+                                            : 'Radius (Km)',
+                                        labelStyle: TextStyle(
+                                          color: Colors.grey.shade600,
+                                        ),
                                         border: InputBorder.none,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 16,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -772,7 +907,9 @@ class _ADLsPageState extends State<ADLsPage> {
                                     height: 300,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.grey.shade200),
+                                      border: Border.all(
+                                        color: Colors.grey.shade200,
+                                      ),
                                     ),
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(16),
@@ -786,45 +923,64 @@ class _ADLsPageState extends State<ADLsPage> {
                                           onTap: (tapPosition, point) {
                                             setState(() {
                                               selectedLatLngMod = point;
-                                              
+
                                               circleMarkersMod = [
                                                 CircleMarker(
                                                   point: selectedLatLngMod!,
                                                   radius: radioEnMetrosMod,
-                                                  color: Colors.blue.withOpacity(0.5),
+                                                  color: Colors.blue
+                                                      .withOpacity(0.5),
                                                   borderColor: colorPrimario,
                                                   borderStrokeWidth: 2,
                                                   useRadiusInMeter: true,
                                                 ),
                                               ];
-                                              
-                                              final latParam = ParametrosValorList.firstWhere(
-                                                (parametro) => parametro.Parametro == 'LATITUD',
-                                              );
-                                              final lngParam = ParametrosValorList.firstWhere(
-                                                (parametro) => parametro.Parametro == 'LONGITUD',
-                                              );
-                                              
-                                              valoresModParametros[latParam.CodAlarmaParametro] =
-                                                  point.latitude.toString();
-                                              valoresModParametros[lngParam.CodAlarmaParametro] =
-                                                  point.longitude.toString();
+
+                                              final latParam =
+                                                  ParametrosValorList.firstWhere(
+                                                    (parametro) =>
+                                                        parametro.Parametro ==
+                                                        'LATITUD',
+                                                  );
+                                              final lngParam =
+                                                  ParametrosValorList.firstWhere(
+                                                    (parametro) =>
+                                                        parametro.Parametro ==
+                                                        'LONGITUD',
+                                                  );
+
+                                              valoresModParametros[latParam
+                                                  .CodAlarmaParametro] = point
+                                                  .latitude
+                                                  .toString();
+                                              valoresModParametros[lngParam
+                                                  .CodAlarmaParametro] = point
+                                                  .longitude
+                                                  .toString();
                                             });
                                           },
                                         ),
                                         children: [
                                           TileLayer(
-                                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                            userAgentPackageName: 'dev.fleaflet.flutter_map.example',
+                                            urlTemplate:
+                                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                            userAgentPackageName:
+                                                'dev.fleaflet.flutter_map.example',
                                           ),
                                           if (selectedLatLngMod != null)
-                                            CircleLayer(circles: circleMarkersMod),
+                                            CircleLayer(
+                                              circles: circleMarkersMod,
+                                            ),
                                           if (selectedLatLngMod != null)
                                             MarkerLayer(
                                               markers: [
                                                 Marker(
                                                   point: selectedLatLngMod!,
-                                                  child: const Icon(Icons.location_on, color: Colors.red, size: 30),
+                                                  child: const Icon(
+                                                    Icons.location_on,
+                                                    color: Colors.red,
+                                                    size: 30,
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -835,8 +991,8 @@ class _ADLsPageState extends State<ADLsPage> {
                                   const SizedBox(height: 8),
                                   Text(
                                     isSpanish
-                                      ? 'Toque en el mapa para cambiar la ubicación'
-                                      : 'Tap on the map to change the location',
+                                        ? 'Toque en el mapa para cambiar la ubicación'
+                                        : 'Tap on the map to change the location',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade600,
@@ -849,9 +1005,9 @@ class _ADLsPageState extends State<ADLsPage> {
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     Row(
                       children: [
                         Expanded(
@@ -863,24 +1019,31 @@ class _ADLsPageState extends State<ADLsPage> {
                                   AlarmasPacienteList[index].CodAlarmaPaciente,
                                   desAlarmaController.text,
                                 );
-                                
-                                for (var entry in valoresModParametros.entries) {
-                                  await DBPostgres().DBModAlarmaPacienteConfigParam(
-                                    AlarmasPacienteList[index].CodAlarmaPaciente,
-                                    entry.key,
-                                    entry.value,
-                                  );
+
+                                for (var entry
+                                    in valoresModParametros.entries) {
+                                  await DBPostgres()
+                                      .DBModAlarmaPacienteConfigParam(
+                                        AlarmasPacienteList[index]
+                                            .CodAlarmaPaciente,
+                                        entry.key,
+                                        entry.value,
+                                      );
                                 }
-                                
+
                                 setState(() {
                                   getData();
                                 });
-                                
+
                                 if (context.mounted) {
                                   Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text(isSpanish ? 'Actividad actualizada correctamente' : 'Activity updated successfully'),
+                                      content: Text(
+                                        isSpanish
+                                            ? 'Actividad actualizada correctamente'
+                                            : 'Activity updated successfully',
+                                      ),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
@@ -906,9 +1069,9 @@ class _ADLsPageState extends State<ADLsPage> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 8),
-                    
+
                     Row(
                       children: [
                         Expanded(
@@ -916,10 +1079,12 @@ class _ADLsPageState extends State<ADLsPage> {
                             height: 50,
                             child: ElevatedButton.icon(
                               onPressed: () async {
-                                await DBPostgres().DBDesactActAlarmaPacienteConfig(
-                                  AlarmasPacienteList[index].CodAlarmaPaciente,
-                                  'CURRENT_TIMESTAMP',
-                                );
+                                await DBPostgres()
+                                    .DBDesactActAlarmaPacienteConfig(
+                                      AlarmasPacienteList[index]
+                                          .CodAlarmaPaciente,
+                                      'CURRENT_TIMESTAMP',
+                                    );
                                 setState(() {
                                   getData();
                                 });
@@ -927,13 +1092,20 @@ class _ADLsPageState extends State<ADLsPage> {
                                   Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text(isSpanish ? 'Actividad desactivada' : 'Activity deactivated'),
+                                      content: Text(
+                                        isSpanish
+                                            ? 'Actividad desactivada'
+                                            : 'Activity deactivated',
+                                      ),
                                       backgroundColor: Colors.orange,
                                     ),
                                   );
                                 }
                               },
-                              icon: const Icon(Icons.block, color: Colors.white),
+                              icon: const Icon(
+                                Icons.block,
+                                color: Colors.white,
+                              ),
                               label: Text(
                                 isSpanish ? 'Desactivar' : 'Deactivate',
                                 style: const TextStyle(
@@ -953,7 +1125,7 @@ class _ADLsPageState extends State<ADLsPage> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -974,10 +1146,10 @@ class _ADLsPageState extends State<ADLsPage> {
     TimeOfDay? horaFin;
     Map<int, String> valoresParametros = {};
     late LatLng? selectedLatLng;
-    
+
     bool horaFinEsMenor = false;
     bool mostrarAdvertenciaRangoNocturno = false;
-    
+
     if (widget.CasaList.isNotEmpty) {
       selectedLatLng = LatLng(
         widget.CasaList[0].Latitud,
@@ -1021,7 +1193,7 @@ class _ADLsPageState extends State<ADLsPage> {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      
+
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.grey.shade50,
@@ -1034,8 +1206,10 @@ class _ADLsPageState extends State<ADLsPage> {
                               value: alarma,
                               child: Text(
                                 isSpanish
-                                    ? (adlTranslations[alarma.Alarma] ?? alarma.Alarma)
-                                    : (adlTranslationsEN[alarma.Alarma] ?? alarma.Alarma),
+                                    ? (adlTranslations[alarma.Alarma] ??
+                                          alarma.Alarma)
+                                    : (adlTranslationsEN[alarma.Alarma] ??
+                                          alarma.Alarma),
                               ),
                             ),
                           ).toList(),
@@ -1043,11 +1217,10 @@ class _ADLsPageState extends State<ADLsPage> {
                             if (newValue != null) {
                               selectedCodAlarma = newValue.CodAlarma;
                               selectedAlarma = newValue.Alarma;
-                              ParametrosList =
-                                  AlarmaParametrosList.where(
-                                    (parametro) =>
-                                        parametro.CodAlarma == selectedCodAlarma,
-                                  ).toList();
+                              ParametrosList = AlarmaParametrosList.where(
+                                (parametro) =>
+                                    parametro.CodAlarma == selectedCodAlarma,
+                              ).toList();
                               showParametrosDropdown = true;
                             } else {
                               showParametrosDropdown = false;
@@ -1080,16 +1253,21 @@ class _ADLsPageState extends State<ADLsPage> {
                             });
                           },
                           decoration: InputDecoration(
-                            labelText: isSpanish ? 'Seleccionar actividad' : 'Select activity',
+                            labelText: isSpanish
+                                ? 'Seleccionar actividad'
+                                : 'Select activity',
                             labelStyle: TextStyle(color: Colors.grey.shade600),
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.grey.shade50,
@@ -1099,16 +1277,21 @@ class _ADLsPageState extends State<ADLsPage> {
                         child: TextFormField(
                           controller: desAlarmaController,
                           decoration: InputDecoration(
-                            labelText: isSpanish ? 'Descripción de la actividad' : 'Activity description',
+                            labelText: isSpanish
+                                ? 'Descripción de la actividad'
+                                : 'Activity description',
                             labelStyle: TextStyle(color: Colors.grey.shade600),
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       if (mostrarAdvertenciaRangoNocturno)
                         Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -1120,105 +1303,188 @@ class _ADLsPageState extends State<ADLsPage> {
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.warning_amber, color: Colors.amber, size: 20),
+                              Icon(
+                                Icons.warning_amber,
+                                color: Colors.amber,
+                                size: 20,
+                              ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   isSpanish
-                                    ? 'La hora de fin es posterior a la de inicio. El rango de chequeo será hasta el día siguiente.'
-                                    : 'The end time is after the start time. The checking range will be until the next day.',
+                                      ? 'La hora de fin es posterior a la de inicio. El rango de chequeo será hasta el día siguiente.'
+                                      : 'The end time is after the start time. The checking range will be until the next day.',
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      
+
                       if (showParametrosDropdown == true &&
                           selectedAlarma != "PUNTO PROHIBIDO" &&
                           selectedAlarma != "RANGO DE ACCION")
                         ...ParametrosList.map((parametro) {
                           if (parametro.Parametro == "HABITACION") {
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade50,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: MultiSelectDialogField<String>(
-                                listType: MultiSelectListType.LIST,
-                                initialValue: [],
-                                items: widget.HabitacionesList.map((item) {
-                                  return MultiSelectItem<String>(
-                                    item.CodHabitacionSensor!,
-                                    '${translateRoomType(item.TipoHabitacion)} ${item.Observaciones}',
-                                  );
-                                }).toList(),
-                                title: Text(isSpanish ? 'Habitación' : 'Room'),
-                                selectedColor: colorPrimario,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.grey.shade200),
+                            // Obtener el nombre de la habitación seleccionada
+                            String getSelectedRoomText() {
+                              if (valoresParametros.containsKey(
+                                    parametro.CodAlarmaParametro,
+                                  ) &&
+                                  valoresParametros[parametro
+                                          .CodAlarmaParametro]!
+                                      .isNotEmpty) {
+                                String selectedCode =
+                                    valoresParametros[parametro
+                                        .CodAlarmaParametro]!;
+                                // Buscar la habitación por su código
+                                for (var habitacion
+                                    in widget.HabitacionesList) {
+                                  if (habitacion.CodHabitacionSensor != null &&
+                                      habitacion.CodHabitacionSensor ==
+                                          selectedCode) {
+                                    return '${translateRoomType(habitacion.TipoHabitacion)} ${habitacion.Observaciones}';
+                                  }
+                                }
+                              }
+                              return isSpanish
+                                  ? "Seleccionar habitación"
+                                  : "Select room";
+                            }
+
+                            return GestureDetector(
+                              onTap: () async {
+                                // Mostrar diálogo de selección de habitación
+                                String? selectedCode =
+                                    valoresParametros.containsKey(
+                                      parametro.CodAlarmaParametro,
+                                    )
+                                    ? valoresParametros[parametro
+                                          .CodAlarmaParametro]
+                                    : null;
+
+                                String? result = await showDialog<String>(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    String? tempSelected = selectedCode;
+
+                                    return AlertDialog(
+                                      title: Text(
+                                        isSpanish
+                                            ? 'Seleccionar habitación'
+                                            : 'Select room',
+                                      ),
+                                      content: SizedBox(
+                                        width: double.maxFinite,
+                                        child: ListView.builder(
+                                          shrinkWrap: true,
+                                          itemCount:
+                                              widget.HabitacionesList.length,
+                                          itemBuilder: (context, index) {
+                                            final habitacion =
+                                                widget.HabitacionesList[index];
+                                            final nombreCompleto =
+                                                '${translateRoomType(habitacion.TipoHabitacion)} ${habitacion.Observaciones}';
+                                            final codigo =
+                                                habitacion
+                                                    .CodHabitacionSensor ??
+                                                '';
+
+                                            // Solo mostrar habitaciones que tienen código válido
+                                            if (codigo.isEmpty)
+                                              return const SizedBox.shrink();
+
+                                            return RadioListTile<String>(
+                                              title: Text(nombreCompleto),
+                                              value: codigo,
+                                              groupValue: tempSelected,
+                                              onChanged: (String? value) {
+                                                tempSelected = value;
+                                                Navigator.pop(context, value);
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: Text(
+                                            isSpanish ? 'Cancelar' : 'Cancel',
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+
+                                if (result != null) {
+                                  setState(() {
+                                    valoresParametros[parametro
+                                            .CodAlarmaParametro] =
+                                        result;
+                                  });
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
                                 ),
-                                buttonText: Text(
-                                  isSpanish ? "Habitación" : "Room",
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 14,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.grey.shade200,
                                   ),
                                 ),
-                                buttonIcon: Icon(
-                                  Icons.arrow_drop_down,
-                                  color: Colors.grey.shade600,
-                                ),
-                                onConfirm: (results) {
-                                  if (results.isEmpty) {
-                                    showDialog(
-                                      context: context,
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          title: Row(
-                                            children: [
-                                              Icon(Icons.error, color: Colors.red),
-                                              const SizedBox(width: 10),
-                                              const Text("Error"),
-                                            ],
-                                          ),
-                                          content: Text(
-                                            isSpanish
-                                                ? "Debe seleccionar al menos una habitación"
-                                                : "You must select at least one room",
-                                          ),
-                                          actions: <Widget>[
-                                            TextButton(
-                                              child: Text(
-                                                isSpanish ? "Cerrar" : "Close",
-                                                style: TextStyle(color: colorPrimario),
-                                              ),
-                                              onPressed: () {
-                                                Navigator.of(context).pop();
-                                              },
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            isSpanish ? 'Habitación' : 'Room',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
                                             ),
-                                          ],
-                                        );
-                                      },
-                                    );
-                                  } else {
-                                    setState(() {
-                                      String resultString = results
-                                          .map((e) => e.toString())
-                                          .join(', ');
-                                      valoresParametros[parametro
-                                              .CodAlarmaParametro] =
-                                          resultString;
-                                    });
-                                  }
-                                },
-                                chipDisplay: MultiSelectChipDisplay.none(),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            getSelectedRoomText(),
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight:
+                                                  valoresParametros.containsKey(
+                                                    parametro
+                                                        .CodAlarmaParametro,
+                                                  )
+                                                  ? FontWeight.w500
+                                                  : FontWeight.normal,
+                                              color:
+                                                  valoresParametros.containsKey(
+                                                    parametro
+                                                        .CodAlarmaParametro,
+                                                  )
+                                                  ? Colors.black
+                                                  : Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.arrow_drop_down,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ],
+                                ),
                               ),
                             );
                           } else if (parametro.Parametro == "HORA INICIO") {
@@ -1229,7 +1495,8 @@ class _ADLsPageState extends State<ADLsPage> {
                                   final selectedTimeInicio =
                                       await showTimePicker(
                                         context: context,
-                                        initialTime: horaInicio ?? TimeOfDay.now(),
+                                        initialTime:
+                                            horaInicio ?? TimeOfDay.now(),
                                       );
                                   if (selectedTimeInicio != null) {
                                     setState(() {
@@ -1237,10 +1504,14 @@ class _ADLsPageState extends State<ADLsPage> {
                                       valoresParametros[parametro
                                               .CodAlarmaParametro] =
                                           '${horaInicio!.hour.toString().padLeft(2, '0')}:${horaInicio!.minute.toString().padLeft(2, '0')}';
-                                      
+
                                       if (horaFin != null) {
-                                        horaFinEsMenor = _esHoraFinMenor(horaInicio!, horaFin!);
-                                        mostrarAdvertenciaRangoNocturno = horaFinEsMenor;
+                                        horaFinEsMenor = _esHoraFinMenor(
+                                          horaInicio!,
+                                          horaFin!,
+                                        );
+                                        mostrarAdvertenciaRangoNocturno =
+                                            horaFinEsMenor;
                                       }
                                     });
                                   }
@@ -1249,26 +1520,40 @@ class _ADLsPageState extends State<ADLsPage> {
                                   decoration: BoxDecoration(
                                     color: Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.grey.shade200),
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                    ),
                                   ),
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
                                     child: Row(
                                       children: [
-                                        Icon(Icons.access_time, color: colorPrimario),
+                                        Icon(
+                                          Icons.access_time,
+                                          color: colorPrimario,
+                                        ),
                                         const SizedBox(width: 12),
                                         Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              isSpanish ? 'Hora de inicio' : 'Start time',
+                                              isSpanish
+                                                  ? 'Hora de inicio'
+                                                  : 'Start time',
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.grey.shade600,
                                               ),
                                             ),
                                             Text(
-                                              horaInicio?.format(context) ?? (isSpanish ? 'Seleccionar' : 'Select'),
+                                              horaInicio?.format(context) ??
+                                                  (isSpanish
+                                                      ? 'Seleccionar'
+                                                      : 'Select'),
                                               style: const TextStyle(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w500,
@@ -1287,21 +1572,24 @@ class _ADLsPageState extends State<ADLsPage> {
                               margin: const EdgeInsets.only(bottom: 12),
                               child: GestureDetector(
                                 onTap: () async {
-                                  final selectedTimeFin =
-                                      await showTimePicker(
-                                        context: context,
-                                        initialTime: horaFin ?? TimeOfDay.now(),
-                                      );
+                                  final selectedTimeFin = await showTimePicker(
+                                    context: context,
+                                    initialTime: horaFin ?? TimeOfDay.now(),
+                                  );
                                   if (selectedTimeFin != null) {
                                     setState(() {
                                       horaFin = selectedTimeFin;
                                       valoresParametros[parametro
                                               .CodAlarmaParametro] =
                                           '${horaFin!.hour.toString().padLeft(2, '0')}:${horaFin!.minute.toString().padLeft(2, '0')}';
-                                      
+
                                       if (horaInicio != null) {
-                                        horaFinEsMenor = _esHoraFinMenor(horaInicio!, horaFin!);
-                                        mostrarAdvertenciaRangoNocturno = horaFinEsMenor;
+                                        horaFinEsMenor = _esHoraFinMenor(
+                                          horaInicio!,
+                                          horaFin!,
+                                        );
+                                        mostrarAdvertenciaRangoNocturno =
+                                            horaFinEsMenor;
                                       }
                                     });
                                   }
@@ -1310,26 +1598,40 @@ class _ADLsPageState extends State<ADLsPage> {
                                   decoration: BoxDecoration(
                                     color: Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.grey.shade200),
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                    ),
                                   ),
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
                                     child: Row(
                                       children: [
-                                        Icon(Icons.access_time, color: colorPrimario),
+                                        Icon(
+                                          Icons.access_time,
+                                          color: colorPrimario,
+                                        ),
                                         const SizedBox(width: 12),
                                         Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              isSpanish ? 'Hora de fin' : 'End time',
+                                              isSpanish
+                                                  ? 'Hora de fin'
+                                                  : 'End time',
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.grey.shade600,
                                               ),
                                             ),
                                             Text(
-                                              horaFin?.format(context) ?? (isSpanish ? 'Seleccionar' : 'Select'),
+                                              horaFin?.format(context) ??
+                                                  (isSpanish
+                                                      ? 'Seleccionar'
+                                                      : 'Select'),
                                               style: const TextStyle(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w500,
@@ -1358,7 +1660,7 @@ class _ADLsPageState extends State<ADLsPage> {
                             return const SizedBox.shrink();
                           }
                         }).toList(),
-                      
+
                       if (showParametrosDropdown == true &&
                           (selectedAlarma == "PUNTO PROHIBIDO" ||
                               selectedAlarma == "RANGO DE ACCION"))
@@ -1372,9 +1674,10 @@ class _ADLsPageState extends State<ADLsPage> {
                               ),
                               child: TextFormField(
                                 controller: radioPuntoProhibidoController,
-                                keyboardType: const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                                 inputFormatters: [
                                   FilteringTextInputFormatter.allow(
                                     RegExp(r'^\d+(?:\.\d{0,2})?$'),
@@ -1409,26 +1712,39 @@ class _ADLsPageState extends State<ADLsPage> {
                                   });
                                 },
                                 decoration: InputDecoration(
-                                  labelText: isSpanish ? 'Radio (Km)' : 'Radius (Km)',
-                                  labelStyle: TextStyle(color: Colors.grey.shade600),
+                                  labelText: isSpanish
+                                      ? 'Radio (Km)'
+                                      : 'Radius (Km)',
+                                  labelStyle: TextStyle(
+                                    color: Colors.grey.shade600,
+                                  ),
                                   border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
                                 ),
                               ),
                             ),
-                            
+
                             if (selectedAlarma == "PUNTO PROHIBIDO")
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8.0,
+                                ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.info_outline, color: colorPrimario, size: 16),
+                                    Icon(
+                                      Icons.info_outline,
+                                      color: colorPrimario,
+                                      size: 16,
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        isSpanish 
-                                          ? 'Toque en el mapa para seleccionar el punto prohibido' 
-                                          : 'Tap on the map to select the forbidden point',
+                                        isSpanish
+                                            ? 'Toque en el mapa para seleccionar el punto prohibido'
+                                            : 'Tap on the map to select the forbidden point',
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey,
@@ -1439,7 +1755,7 @@ class _ADLsPageState extends State<ADLsPage> {
                                   ],
                                 ),
                               ),
-                              
+
                             const SizedBox(height: 16),
                             Container(
                               height: 300,
@@ -1453,12 +1769,12 @@ class _ADLsPageState extends State<ADLsPage> {
                                   mapController: _mapController,
                                   options: MapOptions(
                                     initialCenter: LatLng(
-                                      widget.CasaList.isNotEmpty 
-                                        ? widget.CasaList[0].Latitud 
-                                        : 40.416775,
-                                      widget.CasaList.isNotEmpty 
-                                        ? widget.CasaList[0].Longitud 
-                                        : -3.703790,
+                                      widget.CasaList.isNotEmpty
+                                          ? widget.CasaList[0].Latitud
+                                          : 40.416775,
+                                      widget.CasaList.isNotEmpty
+                                          ? widget.CasaList[0].Longitud
+                                          : -3.703790,
                                     ),
                                     initialZoom: 16,
                                     maxZoom: 18,
@@ -1483,13 +1799,15 @@ class _ADLsPageState extends State<ADLsPage> {
                                           codAlarmaParametroLatitud =
                                               ParametrosList.firstWhere(
                                                 (parametro) =>
-                                                    parametro.Parametro == 'LATITUD',
+                                                    parametro.Parametro ==
+                                                    'LATITUD',
                                               ).CodAlarmaParametro;
 
                                           codAlarmaParametroLongitud =
                                               ParametrosList.firstWhere(
                                                 (parametro) =>
-                                                    parametro.Parametro == 'LONGITUD',
+                                                    parametro.Parametro ==
+                                                    'LONGITUD',
                                               ).CodAlarmaParametro;
 
                                           valoresParametros[codAlarmaParametroLatitud] =
@@ -1497,7 +1815,9 @@ class _ADLsPageState extends State<ADLsPage> {
                                           valoresParametros[codAlarmaParametroLongitud] =
                                               selectedLongitude.toString();
                                         } catch (e) {
-                                          print('Error al obtener parámetros: $e');
+                                          print(
+                                            'Error al obtener parámetros: $e',
+                                          );
                                         }
                                       });
                                     },
@@ -1530,9 +1850,9 @@ class _ADLsPageState extends State<ADLsPage> {
                             ),
                           ],
                         ),
-                      
+
                       const SizedBox(height: 24),
-                      
+
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -1541,27 +1861,31 @@ class _ADLsPageState extends State<ADLsPage> {
                             if (selectedAlarma == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(isSpanish 
-                                    ? 'Por favor seleccione una actividad' 
-                                    : 'Please select an activity'),
+                                  content: Text(
+                                    isSpanish
+                                        ? 'Por favor seleccione una actividad'
+                                        : 'Please select an activity',
+                                  ),
                                   backgroundColor: Colors.red,
                                 ),
                               );
                               return;
                             }
-                            
+
                             if (desAlarmaController.text.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(isSpanish 
-                                    ? 'Por favor ingrese una descripción' 
-                                    : 'Please enter a description'),
+                                  content: Text(
+                                    isSpanish
+                                        ? 'Por favor ingrese una descripción'
+                                        : 'Please enter a description',
+                                  ),
                                   backgroundColor: Colors.red,
                                 ),
                               );
                               return;
                             }
-                            
+
                             var codAlarmaPaciente = await DBPostgres()
                                 .DBAnagdirAlarmaPaciente(
                                   widget.paciente.CodPaciente,
@@ -1584,7 +1908,11 @@ class _ADLsPageState extends State<ADLsPage> {
                                 Navigator.pop(context);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(isSpanish ? 'Actividad agregada correctamente' : 'Activity added successfully'),
+                                    content: Text(
+                                      isSpanish
+                                          ? 'Actividad agregada correctamente'
+                                          : 'Activity added successfully',
+                                    ),
                                     backgroundColor: Colors.green,
                                   ),
                                 );
@@ -1608,7 +1936,7 @@ class _ADLsPageState extends State<ADLsPage> {
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 16),
                     ],
                   ),
