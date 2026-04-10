@@ -51,6 +51,7 @@ class _LogInScreenState extends State<LogInScreen> {
   late FlutterLocalization _flutterLocalization;
   late String _currentLocale;
   String selectedLanguage = 'es';
+  Key _refreshKey = UniqueKey(); // Key para forzar reconstrucción
   
   final colorPrimario = const Color.fromARGB(255, 25, 144, 234);
   final _formKey = GlobalKey<FormState>();
@@ -62,22 +63,40 @@ class _LogInScreenState extends State<LogInScreen> {
     _currentLocale = _flutterLocalization.currentLocale?.languageCode ?? 'es';
     selectedLanguage = _currentLocale;
     
-    // Limpiar cualquier sesión anterior al iniciar
+    // Listener para cambios de idioma
+    _flutterLocalization.onTranslatedLanguage = _onLanguageChanged;
+    
     SesionActual.limpiar();
+  }
+
+  void _onLanguageChanged(Locale? locale) {
+    if (mounted) {
+      setState(() {
+        _currentLocale = locale?.languageCode ?? 'es';
+        selectedLanguage = _currentLocale;
+        _refreshKey = UniqueKey(); // Forzar reconstrucción
+      });
+    }
   }
 
   void _setLocale(String? value) {
     if (value == null) return;
+    // Esto activará el listener _onLanguageChanged
     _flutterLocalization.translate(value);
-    setState(() { 
-      _currentLocale = value;
-      selectedLanguage = value;
-    });
+  }
+
+  @override
+  void dispose() {
+    _flutterLocalization.onTranslatedLanguage = null;
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isSpanish = _currentLocale == 'es';
+    
     return Scaffold(
+      key: _refreshKey, // Usamos la key para forzar reconstrucción
       appBar: AppBar(
         backgroundColor: Colors.white,
         actions: [
@@ -101,7 +120,7 @@ class _LogInScreenState extends State<LogInScreen> {
                   child: Row(
                     children: [
                       const SizedBox(width: 8),
-                      Text(LocaleData.es.getString(context)),
+                      Text('Español'),
                     ],
                   ),
                 ),
@@ -110,22 +129,21 @@ class _LogInScreenState extends State<LogInScreen> {
                   child: Row(
                     children: [
                       const SizedBox(width: 8),
-                      Text(LocaleData.en.getString(context)),
+                      Text('English'),
                     ],
                   ),
                 ),
               ],
               onChanged: (value) {
-                setState(() {
-                  selectedLanguage = value!;
+                if (value != null) {
+                  selectedLanguage = value;
                   _setLocale(value);
-                });
+                }
               },
             ),
           ),
         ],
       ),
-      key: scaffoldKey,
       body: Stack(
         children: [
           // Imagen de fondo
@@ -173,7 +191,7 @@ class _LogInScreenState extends State<LogInScreen> {
                     const SizedBox(height: 10),
                     
                     Text(
-                      LocaleData.body.getString(context),
+                      isSpanish ? 'Inicia sesión en tu cuenta' : 'Sign in to your account',
                       style: GoogleFonts.roboto(
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
@@ -184,7 +202,7 @@ class _LogInScreenState extends State<LogInScreen> {
                     
                     const SizedBox(height: 30),
                     
-                    // Campo E-Mail (obligatorio)
+                    // Campo E-Mail
                     Container(
                       decoration: BoxDecoration(
                         boxShadow: [
@@ -200,11 +218,10 @@ class _LogInScreenState extends State<LogInScreen> {
                         obscureText: false,
                         validator: (val) {
                           if (val == null || val.isEmpty) {
-                            return LocaleData.errorField.getString(context);
+                            return isSpanish ? 'Campo obligatorio' : 'Required field';
                           }
-                          // Validación básica de email
                           if (!val.contains('@') || !val.contains('.')) {
-                            return _currentLocale == 'es'
+                            return isSpanish
                                 ? 'Ingresa un email válido'
                                 : 'Enter a valid email';
                           }
@@ -216,7 +233,7 @@ class _LogInScreenState extends State<LogInScreen> {
                           });
                         },
                         decoration: InputDecoration(
-                          labelText: LocaleData.inputEmail.getString(context),
+                          labelText: isSpanish ? 'Correo electrónico' : 'Email',
                           hintText: 'ejemplo@correo.com',
                           prefixIcon: Icon(Icons.email_outlined, color: colorPrimario, size: 22),
                           filled: true,
@@ -244,7 +261,7 @@ class _LogInScreenState extends State<LogInScreen> {
                     
                     const SizedBox(height: 16),
                     
-                    // Campo Password (opcional)
+                    // Campo Password
                     Container(
                       decoration: BoxDecoration(
                         boxShadow: [
@@ -264,9 +281,7 @@ class _LogInScreenState extends State<LogInScreen> {
                           });
                         },
                         decoration: InputDecoration(
-                          labelText: _currentLocale == 'es' 
-                              ? 'Contraseña' 
-                              : 'Password',
+                          labelText: isSpanish ? 'Contraseña' : 'Password',
                           hintText: '••••••••',
                           prefixIcon: Icon(Icons.lock_outline, color: colorPrimario, size: 22),
                           suffixIcon: IconButton(
@@ -311,7 +326,7 @@ class _LogInScreenState extends State<LogInScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  _currentLocale == 'es' 
+                                  isSpanish 
                                       ? 'Ingresa tu email primero' 
                                       : 'Enter your email first'
                                 ),
@@ -324,7 +339,7 @@ class _LogInScreenState extends State<LogInScreen> {
                           foregroundColor: colorPrimario,
                         ),
                         child: Text(
-                          LocaleData.passwordForgotten.getString(context),
+                          isSpanish ? '¿Olvidaste tu contraseña?' : 'Forgot password?',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -341,14 +356,13 @@ class _LogInScreenState extends State<LogInScreen> {
                       height: 55,
                       child: ElevatedButton(
                         onPressed: isLoading ? null : () {
-                          // Solo validamos que el email no esté vacío
                           if (emailController.text.isNotEmpty) {
                             LoginButton(emailController.text, passwordController.text);
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  _currentLocale == 'es' 
+                                  isSpanish 
                                       ? 'Por favor ingresa tu email' 
                                       : 'Please enter your email'
                                 ),
@@ -379,7 +393,7 @@ class _LogInScreenState extends State<LogInScreen> {
                                   ),
                                   const SizedBox(width: 12),
                                   Text(
-                                    LocaleData.logging.getString(context),
+                                    isSpanish ? 'Iniciando sesión...' : 'Logging in...',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
@@ -388,7 +402,7 @@ class _LogInScreenState extends State<LogInScreen> {
                                 ],
                               )
                             : Text(
-                                LocaleData.inputLogIn.getString(context),
+                                isSpanish ? 'Iniciar sesión' : 'Sign in',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -429,8 +443,8 @@ class _LogInScreenState extends State<LogInScreen> {
                     const SizedBox(width: 8),
                     Text(
                       isLoading 
-                          ? LocaleData.logging.getString(context)
-                          : LocaleData.errorOccurredLog.getString(context),
+                          ? (isSpanish ? 'Iniciando sesión...' : 'Logging in...')
+                          : (isSpanish ? 'Error al iniciar sesión' : 'Login error'),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -447,19 +461,20 @@ class _LogInScreenState extends State<LogInScreen> {
   }
 
   Future<void> LoginButton(String email, String password) async {
+    final isSpanish = _currentLocale == 'es';
+    
     setState(() {
       isLoading = true;
       errorOccurred = false;
     });
 
     try {
-      // Si la contraseña está vacía, pasamos null o string vacío
       String passwordToSend = password.isEmpty ? '' : password;
       var userResponse = await DBPostgres().DBLogIn(email, passwordToSend);
       
       if (userResponse == null || userResponse[1] == null || userResponse[1].isEmpty) {
         _showErrorDialog(
-          _currentLocale == 'es' 
+          isSpanish 
               ? 'Usuario o contraseña incorrectos.' 
               : 'Invalid username or password.'
         );
@@ -480,7 +495,6 @@ class _LogInScreenState extends State<LogInScreen> {
         ));
       }
 
-      // Verificar si la cuenta está activa o inactiva
       if (userTypeFromDB.contains('inact')) {
         _showInactiveAccountDialog(userTypeFromDB);
         setState(() {
@@ -490,7 +504,6 @@ class _LogInScreenState extends State<LogInScreen> {
         return;
       }
 
-      // Guardar sesión
       SesionActual.codUsuario = usuario[0].CodUsuario;
       SesionActual.rol = usuario[0].TipoUsuario;
       SesionActual.email = usuario[0].Email;
@@ -499,7 +512,6 @@ class _LogInScreenState extends State<LogInScreen> {
       await saveLoginStatus(usuario[0].TipoUsuario, usuario[0].CodUsuario);
       await saveIntegerToMemory(usuario[0].CodUsuario);
 
-      // Redireccionar según el tipo de usuario
       if (userTypeFromDB == 'cuidador') {
         if (Platform.isAndroid || Platform.isIOS) {
           FlutterBackgroundService().invoke("setAsBackground");
@@ -524,7 +536,7 @@ class _LogInScreenState extends State<LogInScreen> {
       }
       else if (userTypeFromDB == 'admin' || userTypeFromDB == 'superadmin') {
         _showErrorDialog(
-          _currentLocale == 'es'
+          isSpanish
               ? 'Acceso restringido. Esta aplicación es solo para Cuidadores y Pacientes.'
               : 'Access restricted. This app is for Caregivers and Patients only.'
         );
@@ -535,7 +547,7 @@ class _LogInScreenState extends State<LogInScreen> {
       }
       else {
         _showErrorDialog(
-          _currentLocale == 'es'
+          isSpanish
               ? 'Tipo de usuario no reconocido.'
               : 'User type not recognized.'
         );
@@ -551,7 +563,7 @@ class _LogInScreenState extends State<LogInScreen> {
         isLoading = false;
       });
       _showErrorDialog(
-        _currentLocale == 'es'
+        isSpanish
             ? 'Error al conectar con el servidor.'
             : 'Error connecting to server.'
       );
@@ -559,6 +571,8 @@ class _LogInScreenState extends State<LogInScreen> {
   }
 
   void _showErrorDialog(String message) {
+    final isSpanish = _currentLocale == 'es';
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -570,7 +584,7 @@ class _LogInScreenState extends State<LogInScreen> {
             Icon(Icons.error, color: Colors.red),
             const SizedBox(width: 10),
             Text(
-              _currentLocale == 'es' ? 'Error' : 'Error',
+              isSpanish ? 'Error' : 'Error',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
@@ -586,7 +600,7 @@ class _LogInScreenState extends State<LogInScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                _currentLocale == 'es' ? 'Aceptar' : 'Accept',
+                isSpanish ? 'Aceptar' : 'Accept',
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
@@ -597,17 +611,19 @@ class _LogInScreenState extends State<LogInScreen> {
   }
 
   void _showInactiveAccountDialog(String type) {
+    final isSpanish = _currentLocale == 'es';
+    
     String message = '';
     if (type == 'cuidadorinact') {
-      message = _currentLocale == 'es'
+      message = isSpanish
           ? 'Tu cuenta de cuidador está inactiva. Por favor, contacta con el administrador.'
           : 'Your caregiver account is inactive. Please contact the administrator.';
     } else if (type == 'pacienteinact') {
-      message = _currentLocale == 'es'
+      message = isSpanish
           ? 'Tu cuenta de paciente está inactiva. Por favor, contacta con tu cuidador o administrador.'
           : 'Your patient account is inactive. Please contact your caregiver or administrator.';
     } else {
-      message = _currentLocale == 'es'
+      message = isSpanish
           ? 'Tu cuenta está inactiva. Por favor, contacta con el administrador.'
           : 'Your account is inactive. Please contact the administrator.';
     }
@@ -623,7 +639,7 @@ class _LogInScreenState extends State<LogInScreen> {
             Icon(Icons.warning_amber_rounded, color: Colors.orange),
             const SizedBox(width: 10),
             Text(
-              _currentLocale == 'es' ? 'Cuenta Inactiva' : 'Inactive Account',
+              isSpanish ? 'Cuenta Inactiva' : 'Inactive Account',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
@@ -646,7 +662,7 @@ class _LogInScreenState extends State<LogInScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _currentLocale == 'es'
+                      isSpanish
                           ? 'Contacta con soporte para reactivar tu cuenta.'
                           : 'Contact support to reactivate your account.',
                       style: const TextStyle(fontSize: 12),
@@ -667,7 +683,7 @@ class _LogInScreenState extends State<LogInScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                _currentLocale == 'es' ? 'Entendido' : 'Got it',
+                isSpanish ? 'Entendido' : 'Got it',
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
